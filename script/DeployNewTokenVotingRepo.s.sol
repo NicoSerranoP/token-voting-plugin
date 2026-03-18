@@ -100,7 +100,7 @@ contract DeployNewTokenVotingRepoScript is Script {
         if (block.chainid != 300 && block.chainid != 324) {
             pluginSetup = address(new TokenVotingSetup(new TokenVoting(), governanceERC20, governanceWrappedERC20));
         } else {
-            pluginSetup = address(new TokenVotingSetupZkSync());
+            pluginSetup = address(new TokenVotingSetupZkSync(new TokenVoting()));
         }
 
         // The new plugin repository

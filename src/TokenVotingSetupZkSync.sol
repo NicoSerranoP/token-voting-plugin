@@ -78,8 +78,9 @@ contract TokenVotingSetupZkSync is PluginUpgradeableSetup {
     error TokenNotERC20(address token);
 
     /// @notice The contract constructor deploying the plugin implementation contract.
-    constructor() PluginUpgradeableSetup(address(new TokenVoting())) {
-        tokenVotingBase = TokenVoting(IMPLEMENTATION);
+    /// @param _tokenVotingBase The base `TokenVoting` contract to create proxies for.
+    constructor(TokenVoting _tokenVotingBase) PluginUpgradeableSetup(address(_tokenVotingBase)) {
+        tokenVotingBase = _tokenVotingBase;
     }
 
     /// @inheritdoc IPluginSetup

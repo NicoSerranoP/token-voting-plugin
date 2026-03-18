@@ -78,7 +78,7 @@ contract DeployTokenVoting_1_4Script is Script {
             pluginSetup = address(new TokenVotingSetup(new TokenVoting(), governanceERC20, governanceWrappedERC20));
         } else {
             console2.log("Using TokenVotingSetupZkSync\n");
-            pluginSetup = address(new TokenVotingSetupZkSync());
+            pluginSetup = address(new TokenVotingSetupZkSync(new TokenVoting()));
         }
     }
 
