@@ -409,7 +409,7 @@ contract PluginSetupForkTest is ForkTestBase {
         );
         GovernanceWrappedERC20 governanceWrappedERC20 =
             new GovernanceWrappedERC20(IERC20Upgradeable(address(0)), "", "");
-        TokenVotingSetup pluginSetup = new TokenVotingSetup(governanceERC20, governanceWrappedERC20);
+        TokenVotingSetup pluginSetup = new TokenVotingSetup(new TokenVoting(), governanceERC20, governanceWrappedERC20);
 
         uint256 b = pluginRepo.buildCount(1);
 

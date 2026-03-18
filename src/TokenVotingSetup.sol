@@ -87,12 +87,15 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
 
     /// @notice The contract constructor deploying the plugin implementation contract
     ///     and receiving the governance token base contracts to clone from.
+    /// @param _tokenVotingBase The base `TokenVoting` contract to create proxies for.
     /// @param _governanceERC20Base The base `GovernanceERC20` contract to create clones from.
     /// @param _governanceWrappedERC20Base The base `GovernanceWrappedERC20` contract to create clones from.
-    constructor(GovernanceERC20 _governanceERC20Base, GovernanceWrappedERC20 _governanceWrappedERC20Base)
-        PluginUpgradeableSetup(address(new TokenVoting()))
-    {
-        tokenVotingBase = TokenVoting(IMPLEMENTATION);
+    constructor(
+        TokenVoting _tokenVotingBase,
+        GovernanceERC20 _governanceERC20Base,
+        GovernanceWrappedERC20 _governanceWrappedERC20Base
+    ) PluginUpgradeableSetup(address(_tokenVotingBase)) {
+        tokenVotingBase = _tokenVotingBase;
         governanceERC20Base = address(_governanceERC20Base);
         governanceWrappedERC20Base = address(_governanceWrappedERC20Base);
     }

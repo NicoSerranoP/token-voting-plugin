@@ -6,6 +6,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 
 import {IDAO} from "@aragon/osx/core/dao/DAO.sol";
 import {Action} from "@aragon/osx-commons-contracts/src/executors/Executor.sol";
+import {TokenVoting} from "../src/TokenVoting.sol";
 import {TokenVotingSetup} from "../src/TokenVotingSetup.sol";
 import {TokenVotingSetupZkSync} from "../src/TokenVotingSetupZkSync.sol";
 import {GovernanceERC20} from "../src/erc20/GovernanceERC20.sol";
@@ -74,7 +75,7 @@ contract DeployTokenVoting_1_4Script is Script {
 
         // Plugin setup (the installer)
         if (block.chainid != 300 && block.chainid != 324) {
-            pluginSetup = address(new TokenVotingSetup(governanceERC20, governanceWrappedERC20));
+            pluginSetup = address(new TokenVotingSetup(new TokenVoting(), governanceERC20, governanceWrappedERC20));
         } else {
             console2.log("Using TokenVotingSetupZkSync\n");
             pluginSetup = address(new TokenVotingSetupZkSync());
