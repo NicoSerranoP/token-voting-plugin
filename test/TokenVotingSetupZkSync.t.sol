@@ -48,7 +48,7 @@ contract TokenVotingSetupZkSyncTest is TestBase {
         (dao,,,) = new SimpleBuilder().withDaoOwner(address(this)).build();
 
         // Deploy PluginSetup
-        pluginSetup = new PluginSetupContract();
+        pluginSetup = new PluginSetupContract(new TokenVoting());
 
         // Default settings
         defaultVotingSettings = MajorityVotingBase.VotingSettings({

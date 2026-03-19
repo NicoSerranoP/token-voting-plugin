@@ -85,14 +85,23 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
     /// @param token The token address
     error TokenNotERC20(address token);
 
+    /// @notice Thrown if the implementation address is empty.
+    error InvalidImplementation();
+
     /// @notice The contract constructor deploying the plugin implementation contract
     ///     and receiving the governance token base contracts to clone from.
+    /// @param _tokenVotingBase The base `TokenVoting` contract to create proxies for.
     /// @param _governanceERC20Base The base `GovernanceERC20` contract to create clones from.
     /// @param _governanceWrappedERC20Base The base `GovernanceWrappedERC20` contract to create clones from.
-    constructor(GovernanceERC20 _governanceERC20Base, GovernanceWrappedERC20 _governanceWrappedERC20Base)
-        PluginUpgradeableSetup(address(new TokenVoting()))
-    {
-        tokenVotingBase = TokenVoting(IMPLEMENTATION);
+    constructor(
+        TokenVoting _tokenVotingBase,
+        GovernanceERC20 _governanceERC20Base,
+        GovernanceWrappedERC20 _governanceWrappedERC20Base
+    ) PluginUpgradeableSetup(address(_tokenVotingBase)) {
+        if (address(_tokenVotingBase) == address(0)) revert InvalidImplementation();
+        if (address(_governanceERC20Base) == address(0)) revert InvalidImplementation();
+        if (address(_governanceWrappedERC20Base) == address(0)) revert InvalidImplementation();
+        tokenVotingBase = _tokenVotingBase;
         governanceERC20Base = address(_governanceERC20Base);
         governanceWrappedERC20Base = address(_governanceWrappedERC20Base);
     }
@@ -203,7 +212,7 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
             plugin,
             ANY_ADDR,
             preparedSetupData.helpers[0], // VotingPowerCondition
-            TokenVoting(IMPLEMENTATION).CREATE_PROPOSAL_PERMISSION_ID()
+            tokenVotingBase.CREATE_PROPOSAL_PERMISSION_ID()
         );
 
         permissions[3] = PermissionLib.MultiTargetPermission({
@@ -270,7 +279,7 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
                 _payload.plugin,
                 ANY_ADDR, // ANY_ADDR
                 votingPowerCondition,
-                TokenVoting(IMPLEMENTATION).CREATE_PROPOSAL_PERMISSION_ID()
+                tokenVotingBase.CREATE_PROPOSAL_PERMISSION_ID()
             );
 
             permissions[2] = PermissionLib.MultiTargetPermission({
@@ -352,7 +361,7 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
             where: _payload.plugin,
             who: ANY_ADDR, // ANY_ADDR
             condition: PermissionLib.NO_CONDITION,
-            permissionId: TokenVoting(IMPLEMENTATION).CREATE_PROPOSAL_PERMISSION_ID()
+            permissionId: tokenVotingBase.CREATE_PROPOSAL_PERMISSION_ID()
         });
 
         permissions[5] = PermissionLib.MultiTargetPermission({

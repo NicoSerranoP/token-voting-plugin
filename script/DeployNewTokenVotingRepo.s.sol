@@ -8,6 +8,7 @@ import {IDAO} from "@aragon/osx/core/dao/DAO.sol";
 import {PluginRepoFactory} from "@aragon/osx/framework/plugin/repo/PluginRepoFactory.sol";
 import {PluginRepo} from "@aragon/osx/framework/plugin/repo/PluginRepo.sol";
 import {hashHelpers, PluginSetupRef} from "@aragon/osx/framework/plugin/setup/PluginSetupProcessorHelpers.sol";
+import {TokenVoting} from "../src/TokenVoting.sol";
 import {TokenVotingSetup} from "../src/TokenVotingSetup.sol";
 import {TokenVotingSetupZkSync} from "../src/TokenVotingSetupZkSync.sol";
 import {GovernanceERC20} from "../src/erc20/GovernanceERC20.sol";
@@ -97,9 +98,9 @@ contract DeployNewTokenVotingRepoScript is Script {
 
         // Plugin setup (the installer)
         if (block.chainid != 300 && block.chainid != 324) {
-            pluginSetup = address(new TokenVotingSetup(governanceERC20, governanceWrappedERC20));
+            pluginSetup = address(new TokenVotingSetup(new TokenVoting(), governanceERC20, governanceWrappedERC20));
         } else {
-            pluginSetup = address(new TokenVotingSetupZkSync());
+            pluginSetup = address(new TokenVotingSetupZkSync(new TokenVoting()));
         }
 
         // The new plugin repository

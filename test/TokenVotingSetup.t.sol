@@ -54,7 +54,7 @@ contract TokenVotingSetupTest is TestBase {
         governanceWrappedERC20Base = new GovernanceWrappedERC20(IERC20Upgradeable(address(0x1)), "WG", "WG");
 
         // Deploy PluginSetup
-        pluginSetup = new PluginSetupContract(governanceERC20Base, governanceWrappedERC20Base);
+        pluginSetup = new PluginSetupContract(new TokenVoting(), governanceERC20Base, governanceWrappedERC20Base);
 
         // Default settings
         defaultVotingSettings = MajorityVotingBase.VotingSettings({
