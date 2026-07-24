@@ -3,16 +3,17 @@ cache
 coverage
 out
 zkout
+logs
 
 # Files
 .env
-.env-*
+.env.*
+!.env.example
 *.log
 .DS_Store
 lcov.info
 
 # Testing
-test/**/*.tree
 lcov.info
 report
 

@@ -1,0 +1,9 @@
+# vars manifest — secrets this project resolves via `vars` (https://github.com/vars-cli/vars).
+# Only key NAMES live here; `vars` fetches the values from your configured backend.
+# `vars` is optional: without it, define these in .env instead (see .env.example).
+# just-foundry's recipes auto-run `vars resolve` when `vars` is installed and this file exists.
+keys:
+  - DEPLOYER_KEY
+  - ETHERSCAN_API_KEY
+  - PINATA_JWT
+  # - RPC_URL          # optional: override the network's default RPC with a private endpoint

@@ -22,3 +22,6 @@
 [submodule "lib/plugin-version-1.3"]
 	path = lib/plugin-version-1.3
 	url = https://github.com/aragon/token-voting-plugin-hardhat
+[submodule "lib/just-foundry"]
+	path = lib/just-foundry
+	url = https://github.com/aragon/just-foundry.git
