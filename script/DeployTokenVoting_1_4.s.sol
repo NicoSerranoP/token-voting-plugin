@@ -32,7 +32,7 @@ contract DeployTokenVoting_1_4Script is Script {
     GovernanceWrappedERC20 governanceWrappedERC20;
 
     modifier broadcast() {
-        uint256 privKey = vm.envUint("DEPLOYMENT_PRIVATE_KEY");
+        uint256 privKey = vm.envUint("DEPLOYER_KEY");
         vm.startBroadcast(privKey);
 
         deployer = vm.addr(privKey);
@@ -50,7 +50,7 @@ contract DeployTokenVoting_1_4Script is Script {
         // Pick the contract addresses from
         // https://github.com/aragon/osx/blob/main/packages/artifacts/src/addresses.json
 
-        pluginRepo = PluginRepo(vm.envAddress("PLUGIN_REPO_ADDRESS"));
+        pluginRepo = PluginRepo(vm.envAddress("TOKEN_VOTING_PLUGIN_REPO_ADDRESS"));
         vm.label(address(pluginRepo), "PluginRepo");
     }
 

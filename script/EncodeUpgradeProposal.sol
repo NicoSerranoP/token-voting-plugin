@@ -34,7 +34,7 @@ contract DeployTokenVoting_1_4Script is Script {
         // https://github.com/aragon/osx/blob/main/packages/artifacts/src/addresses.json
 
         pluginSetup = TokenVotingSetup(vm.envAddress("PLUGIN_SETUP"));
-        pluginRepo = PluginRepo(vm.envAddress("PLUGIN_REPO_ADDRESS"));
+        pluginRepo = PluginRepo(vm.envAddress("TOKEN_VOTING_PLUGIN_REPO_ADDRESS"));
         mgmtDaoMultisig = vm.envAddress("MANAGEMENT_DAO_MULTISIG_ADDRESS");
 
         proposalMetadataUri = bytes(vm.envString("PROPOSAL_METADATA_URI"));

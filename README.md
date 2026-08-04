@@ -57,9 +57,11 @@ Other features:
 ## Project structure
 
 ```
-├── Makefile
+├── justfile              # task launcher (imports lib/just-foundry)
 ├── foundry.toml
 ├── remappings.txt
+├── lib
+│   └── just-foundry      # shared just recipes + network configs (submodule)
 ├── npm-artifacts
 │   └── src
 │       ├── abi.ts
@@ -67,7 +69,7 @@ Other features:
 ├── script
 │   ├── DeployNewTokenVotingRepo.s.sol
 │   ├── DeployTokenVoting_1_4.s.sol
-│   ├── make-test-tree.ts
+│   ├── EncodeUpgradeProposal.sol
 │   └── verify-contracts.sh
 ├── src
 │   ├── TokenVoting.sol
@@ -88,139 +90,83 @@ Other features:
 
 ## Prerequisites
 - [Foundry](https://getfoundry.sh/)
-- [Make](https://www.gnu.org/software/make/)
+- [just](https://github.com/casey/just)
 
 Optional:
 
 - [Docker](https://www.docker.com) (recommended for deploying)
-- [Deno](https://deno.land)  (used to scaffold the test files)
 
 ## Getting Started
 
-To get started, clone this repository and initialize it:
+Clone the repository with submodules and initialize it for a network:
 
 ```bash
-cp .env.example .env
-make init
+git clone --recurse-submodules <repo-url>
+just init          # defaults to mainnet, e.g. `just init sepolia`
 ```
 
-Edit `.env` to match your desired network and settings.
+`just init` fetches submodules, creates `.env` from `.env.example`, and selects the network. Edit `.env` to add your secrets (`DEPLOYER_KEY`, `ETHERSCAN_API_KEY`, `PINATA_JWT`, …). Alternatively, resolve them with the [`vars`](https://github.com/vars-cli/vars) secret manager — the keys this project needs are declared in [`.vars.yaml`](./.vars.yaml), and just-foundry's recipes call `vars resolve` automatically when `vars` is installed.
 
-### Using the Makefile
+Network settings (RPC URL, chain id, verifier, and the Aragon OSx addresses) come from `lib/just-foundry/networks/<network>.env` — switch with `just switch <network>`, inspect the resolved values with `just env`, and create a local editable copy with `just switch <network> override`.
 
-The `Makefile` is the target launcher of the project. It's the recommended way to operate the repository. It manages the env variables of common tasks and executes only the steps that need to be run.
+### Using just
+
+`just` is the task launcher for the project; the generic recipes are imported from [`lib/just-foundry`](https://github.com/aragon/just-foundry). Run `just` (or `just help`) to list them:
 
 ```
-$ make
-Available targets:
+$ just
+[setup]
+init network="mainnet"       Fetch submodules, scaffold .env and select the network
+switch network override=""   Select the active network
+setup                        Install Foundry
 
-- make help               Display the available targets
+[metadata]
+pin-metadata                 Pin the release & build metadata to IPFS
+upgrade-proposal             Encode & print the calldata to create the upgrade proposal
 
-- make init               Check the dependencies and prompt to install if needed
-- make clean              Clean the build artifacts
+[script]
+predeploy                    Dry-run the deploy script (no broadcast)
+deploy *args                 Run tests, then broadcast + verify
 
-Testing lifecycle:
+[test]
+test *args                   Run unit tests (fork tests excluded)
+test-fork *args              Run fork tests (requires RPC_URL)
+test-coverage                Generate an HTML coverage report under ./report
 
-- make test               Run unit tests, locally
-- make test-fork          Run fork tests, using RPC_URL
-- make test-coverage      Generate an HTML coverage report under ./report
+[verification]
+verify type="" script=""     Verify the latest broadcast (etherscan|blockscout|sourcify)
 
-- make sync-tests         Scaffold or sync test definitions into solidity tests
-- make check-tests        Checks if the solidity test files are out of sync
-- make test-tree          Generates a markdown file with the test definitions
-- make test-tree-prompt   Prints an LLM prompt to generate the test definitions for a given file
-- make test-prompt        Prints an LLM prompt to implement the tests for a given contract
+[develop]
+clean                        Clean build artifacts and reports
+storage-info contract        Show a contract's storage layout
+check-upgrade from to        Check storage-layout upgrade compatibility
 
-Metadata targets:
-
-- make pin-metadata       Uploads and pins the release/build metadata on IPFS
-
-Deployment targets:
-
-- make predeploy          Simulate a protocol deployment
-- make deploy             Deploy the protocol, verify the source code and write to ./artifacts
-- make resume             Retry pending deployment transactions, verify the code and write to ./artifacts
-
-Upgrade proposal:
-
-- make upgrade-proposal   Encodes and shows the calldata to create the upgrade proposal
-
-Verification:
-
-- make verify-etherscan   Verify the last deployment on an Etherscan (compatible) explorer
-- make verify-blockscout  Verify the last deployment on BlockScout
-- make verify-sourcify    Verify the last deployment on Sourcify
-
-- make refund             Refund the remaining balance left on the deployment account
+[helpers]
+env                          Show the resolved environment (values + sources)
 ```
+
+There are also `balance`, `refund`, `gas-price`, `nonce` and `clean-nonce` deployer helpers (run `just <name>`).
 
 ## Testing
 
-Using `make`:
-
-```
-$ make
-[...]
-Testing lifecycle:
-
-- make test               Run unit tests, locally
-- make test-fork          Run fork tests, using RPC_URL
-- make test-coverage      Generate an HTML coverage report under ./report
-```
-
-Run `make test` or `make test-fork` to check the logic's accordance to the specs. The latter will require `RPC_URL` to be defined.
-
-### Writing tests
-
-Optionally, tests with hierarchies can be described using yaml files like [MyPlugin.t.yaml](./test/MyPlugin.t.yaml), which will be transformed into solidity files by running `make sync-tests`, thanks to [bulloak](https://github.com/alexfertel/bulloak).
-
-Create a file with `.t.yaml` extension within the `test` folder and describe a hierarchy using the following structure:
-
-```yaml
-# MyPlugin.t.yaml
-
-MyPluginTest:
-  - given: The caller has no permission
-    comment: The caller needs MANAGER_PERMISSION_ID
-    and:
-      - when: Calling setNumber()
-        then:
-          - it: Should revert
-  - given: The caller has permission
-    and:
-      - when: Calling setNumber()
-        then:
-          - it: It should update the stored number
-  - when: Calling number()
-    then:
-      - it: Should return the right value
-```
-
-Nodes like `when` and `given` can be nested without limitations.
-
-Then use `make sync-tests` to automatically sync the described branches into solidity test files.
+Run the suites with `just`:
 
 ```sh
-$ make
-Testing lifecycle:
-# ...
-
-- make sync-tests         Scaffold or sync test definitions into solidity tests
-- make check-tests        Checks if the solidity test files are out of sync
-- make test-tree          Generates a markdown file with the test definitions
-
-$ make sync-tests
+just test          # unit tests (fork tests excluded)
+just test-fork     # fork tests (requires a reachable RPC_URL for the active network)
+just test-coverage # HTML coverage report under ./report
 ```
 
-Each yaml file generates (or syncs) a solidity test file with functions ready to be implemented. They also generate a human readable summary in [TESTS.md](./TESTS.md).
+`just test` checks the logic's accordance to the specs; `just test-fork` additionally requires `RPC_URL` (from the selected network or `.env`).
 
 ## Deployment 🚀
 
-Check the available make targets to simulate and deploy the smart contracts:
+Select the target network, then simulate and deploy:
 
-```
-- make predeploy        Simulate a protocol deployment
-- make deploy           Deploy the protocol and verify the source code
+```sh
+just switch <network>
+just predeploy     # simulate (no broadcast)
+just deploy        # run tests, then broadcast + verify; logs to ./logs
 ```
 
 ### Deployment Checklist
@@ -230,7 +176,8 @@ When running a production deployment ceremony, you can use these steps as a refe
 - [ ] I have cloned the official repository on my computer and I have checked out the `main` branch
 - [ ] I am using the latest official docker engine, running a Debian Linux (stable) image
   - [ ] I have run `docker run --rm -it -v .:/deployment debian:bookworm-slim`
-  - [ ] I have run `apt update && apt install -y make curl git vim neovim bc`
+  - [ ] I have run `apt update && apt install -y curl git vim neovim bc`
+  - [ ] I have installed `just` (`curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin`)
   - On **standard EVM networks**:
     - [ ] I have run `curl -L https://foundry.paradigm.xyz | bash`
     - [ ] I have run `source /root/.bashrc`
@@ -240,18 +187,16 @@ When running a production deployment ceremony, you can use these steps as a refe
     - [ ] I have run `source /root/.bashrc`
     - [ ] I have run `foundryup-zksync`
   - [ ] I have run `cd /deployment`
-  - [ ] I have run `cp .env.example .env`
-  - [ ] I have run `make init`
+  - [ ] I have run `just init <network>`
 - [ ] I am opening an editor on the `/deployment` folder, within the Docker container
 - [ ] The `.env` file contains the correct parameters for the deployment
-  - [ ] I have created a new burner wallet with `cast wallet new` and copied the private key to `DEPLOYMENT_PRIVATE_KEY` within `.env`
-  - [ ] I have set the correct `RPC_URL` for the network
-  - [ ] I have set the correct `CHAIN_ID` for the network
+  - [ ] I have created a new burner wallet with `cast wallet new` and copied the private key to `DEPLOYER_KEY` within `.env`
+  - [ ] I have selected the correct network with `just switch <network>` (this sets RPC_URL, CHAIN_ID and the verifier)
   - [ ] I have set `ETHERSCAN_API_KEY` or `BLOCKSCOUT_HOST_NAME` (when relevant to the target network)
   - [ ] (TO DO: Add a step to check your own variables here)
-  - [ ] I have printed the contents of `.env` to the screen
+  - [ ] I have run `just env` and confirmed the resolved values
   - [ ] I am the only person of the ceremony that will operate the deployment wallet
-- [ ] All the tests run clean (`make test`)
+- [ ] All the tests run clean (`just test`)
 - My computer:
   - [ ] Is running in a safe location and using a trusted network
   - [ ] It exposes no services or ports
@@ -259,52 +204,48 @@ When running a production deployment ceremony, you can use these steps as a refe
     - Linux: `netstat -tulpn`
     - Windows: `netstat -nao -p tcp`
   - [ ] The wifi or wired network in use does not expose any ports to a WAN
-- [ ] I have run `make predeploy` and the simulation completes with no errors
+- [ ] I have run `just predeploy` and the simulation completes with no errors
 - [ ] The deployment wallet has sufficient native token for gas
   - At least, 15% more than the amount estimated during the simulation
-- [ ] `make test` still runs clean
+- [ ] `just test` still runs clean
 - [ ] I have run `git status` and it reports no local changes
 - [ ] The current local git branch (`main`) corresponds to its counterpart on `origin`
   - [ ] I confirm that the rest of members of the ceremony pulled the last git commit on `main` and reported the same commit hash as my output for `git log -n 1`
-- [ ] I have initiated the production deployment with `make deploy`
+- [ ] I have initiated the production deployment with `just deploy`
 
 ### Post deployment checklist
 
 - [ ] The deployment process completed with no errors
 - [ ] The factory contract was deployed by the deployment address
 - [ ] All the project's smart contracts are correctly verified on the reference block explorer of the target network.
-- [ ] The output of the latest `logs/deployment-<network>-<date>.log` file corresponds to the console output
+- [ ] The output of the latest `logs/<script>-<network>-<timestamp>.log` file corresponds to the console output
 - [ ] A file called `artifacts/deployment-<network>-<timestamp>.json` has been created, and the addresses match those logged to the screen
 - [ ] I have uploaded the following files to a shared location:
-  - `logs/deployment-<network>.log` (the last one)
+  - `logs/<script>-<network>-<timestamp>.log` (the last one)
   - `artifacts/deployment-<network>-<timestamp>.json`  (the last one)
   - `broadcast/DeployTokenVoting_*.s.sol/<chain-id>/run-<timestamp>.json` (the last one, or `run-latest.json`)
 - [ ] The rest of members confirm that the values are correct
 - [ ] I have transferred the remaining funds of the deployment wallet to the address that originally funded it
-  - `make refund`
+  - `just refund`
 
 This concludes the deployment ceremony.
 
 ## Contract source verification
 
-When running a deployment with `make deploy`, Foundry will attempt to verify the contracts on the corresponding block explorer.
+When running a deployment with `just deploy`, Foundry will attempt to verify the contracts on the corresponding block explorer.
 
-If you need to verify on multiple explorers or the automatic verification did not work, you have three `make` targets available:
+If you need to verify on multiple explorers or the automatic verification did not work, use the `verify` recipe with the desired verifier:
 
-```
-$ make
-[...]
-Verification:
-
-- make verify-etherscan   Verify the last deployment on an Etherscan (compatible) explorer
-- make verify-blockscout  Verify the last deployment on BlockScout
-- make verify-sourcify    Verify the last deployment on Sourcify
+```sh
+just verify etherscan   # or: blockscout, sourcify
+just verify blockscout
+just verify sourcify
 ```
 
-These targets use the last deployment data under `broadcast/DeployTokenVoting_*.s.sol/<chain-id>/run-latest.json`.
-- Ensure that the required variables are set within the `.env` file.
+These use the last deployment data under `broadcast/DeployTokenVoting_*.s.sol/<chain-id>/run-latest.json`.
+- Ensure that the required variables are set within the `.env` file (or the active network).
 
-This flow will attempt to verify all the contracts in one go, but yo umay still need to issue additional manual verifications, depending on the circumstances.
+This flow will attempt to verify all the contracts in one go, but you may still need to issue additional manual verifications, depending on the circumstances.
 
 ### Routescan verification (manual)
 

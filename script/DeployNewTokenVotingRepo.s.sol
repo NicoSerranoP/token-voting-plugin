@@ -38,7 +38,7 @@ contract DeployNewTokenVotingRepoScript is Script {
     address pluginSetup;
 
     modifier broadcast() {
-        uint256 privKey = vm.envUint("DEPLOYMENT_PRIVATE_KEY");
+        uint256 privKey = vm.envUint("DEPLOYER_KEY");
         vm.startBroadcast(privKey);
 
         deployer = vm.addr(privKey);
