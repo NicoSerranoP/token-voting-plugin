@@ -4,13 +4,11 @@ pragma solidity ^0.8.8;
 
 /* solhint-disable max-line-length */
 
-import {ERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {SafeCastUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
 
 import {ProposalUpgradeable} from "@aragon/osx-commons-contracts/src/plugin/extensions/proposal/ProposalUpgradeable.sol";
 import {RATIO_BASE, RatioOutOfBounds} from "@aragon/osx-commons-contracts/src/utils/math/Ratio.sol";
-import {PluginUUPSUpgradeable} from "@aragon/osx-commons-contracts/src/plugin/PluginUUPSUpgradeable.sol";
+import {PluginCloneable} from "@aragon/osx-commons-contracts/src/plugin/PluginCloneable.sol";
 import {IDAO} from "@aragon/osx-commons-contracts/src/dao/IDAO.sol";
 import {IProposal} from "@aragon/osx-commons-contracts/src/plugin/extensions/proposal/IProposal.sol";
 import {Action} from "@aragon/osx-commons-contracts/src/executors/IExecutor.sol";
@@ -122,10 +120,8 @@ import {IMajorityVoting} from "./IMajorityVoting.sol";
 /// @custom:security-contact sirt@aragon.org
 abstract contract MajorityVotingBase is
     IMajorityVoting,
-    Initializable,
-    ERC165Upgradeable,
     MetadataExtensionUpgradeable,
-    PluginUUPSUpgradeable,
+    PluginCloneable,
     ProposalUpgradeable
 {
     using SafeCastUpgradeable for uint256;
@@ -308,7 +304,7 @@ abstract contract MajorityVotingBase is
         uint256 _minApprovals,
         bytes calldata _pluginMetadata
     ) internal onlyInitializing {
-        __PluginUUPSUpgradeable_init(_dao);
+        __PluginCloneable_init(_dao);
         _updateVotingSettings(_votingSettings);
         _updateMinApprovals(_minApprovals);
         _setTargetConfig(_targetConfig);
@@ -322,7 +318,7 @@ abstract contract MajorityVotingBase is
         public
         view
         virtual
-        override(ERC165Upgradeable, MetadataExtensionUpgradeable, PluginUUPSUpgradeable, ProposalUpgradeable)
+        override(MetadataExtensionUpgradeable, PluginCloneable, ProposalUpgradeable)
         returns (bool)
     {
         // In addition to the current IMajorityVoting interface, also support previous version
@@ -757,9 +753,4 @@ abstract contract MajorityVotingBase is
         }
     }
 
-    /// @notice This empty reserved space is put in place to allow future versions to add
-    /// new variables without shifting down storage in the inheritance chain
-    /// (see [OpenZeppelin's guide about storage gaps]
-    /// (https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps)).
-    uint256[46] private __gap;
 }

@@ -5,7 +5,6 @@ pragma solidity ^0.8.8;
 import {DAO, IDAO, Action} from "@aragon/osx/core/dao/DAO.sol";
 import {IProposal} from "@aragon/osx-commons-contracts/src/plugin/extensions/proposal/IProposal.sol";
 import {MajorityVotingBase} from "./base/MajorityVotingBase.sol";
-import {PluginUUPSUpgradeable} from "@aragon/osx/framework/plugin/setup/PluginSetupProcessor.sol";
 import {IMembership} from "@aragon/osx-commons-contracts/src/plugin/extensions/membership/IMembership.sol";
 import {_applyRatioCeiled} from "@aragon/osx-commons-contracts/src/utils/math/Ratio.sol";
 
@@ -20,8 +19,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 /// @notice The majority voting implementation using an
 ///         [OpenZeppelin `Votes`](https://docs.openzeppelin.com/contracts/4.x/api/governance#Votes)
 ///         compatible governance token.
-/// @dev v1.4 (Release 1, Build 4). For each upgrade, if the reinitialization step is required,
-///      increment the version numbers in the modifier for both the initialize and initializeFrom functions.
 /// @custom:security-contact sirt@aragon.org
 contract TokenVoting is IMembership, MajorityVotingBase {
     using SafeCastUpgradeable for uint256;
@@ -72,7 +69,7 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         uint256 _minApprovals,
         bytes calldata _pluginMetadata,
         address[] memory _excludedAccounts
-    ) external onlyCallAtInitialization reinitializer(3) {
+    ) external initializer {
         __MajorityVotingBase_init(_dao, _votingSettings, _targetConfig, _minApprovals, _pluginMetadata);
 
         votingToken = _token;
@@ -91,34 +88,6 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         }
 
         emit MembershipContractAnnounced({definingContract: address(_token)});
-    }
-
-    /// @notice Reinitializes the TokenVoting after an upgrade from a previous build version. For each
-    ///         reinitialization step, use the `_fromBuild` version to decide which internal functions to
-    ///         call for reinitialization.
-    /// @dev WARNING: The contract should only be upgradeable through PSP to ensure that _fromBuild is not
-    ///      incorrectly passed, and that the appropriate permissions for the upgrade are properly configured.
-    /// @param _fromBuild Build version number of previous implementation contract this upgrade is transitioning from.
-    /// @param _initData The initialization data to be passed to via `upgradeToAndCall`
-    ///     (see [ERC-1967](https://docs.openzeppelin.com/contracts/4.x/api/proxy#ERC1967Upgrade)).
-    function initializeFrom(uint16 _fromBuild, bytes calldata _initData) external reinitializer(3) {
-        if (_fromBuild < 3) {
-            (uint256 minApprovals, TargetConfig memory targetConfig, bytes memory pluginMetadata) =
-                abi.decode(_initData, (uint256, TargetConfig, bytes));
-
-            _updateMinApprovals(minApprovals);
-
-            _setTargetConfig(targetConfig);
-
-            _setMetadata(pluginMetadata);
-        }
-        if (_fromBuild < 4) {
-            _detectTokenClock();
-
-            // @dev The list of excluded accounts are intentionally skipped here
-            //      Changing the excluded supply on the fly could break important governance invariants,
-            //      therefore such feature is only allowed during the first initialization.
-        }
     }
 
     /// @notice Checks if this or the parent contract supports an interface by its ID.
@@ -366,8 +335,4 @@ contract TokenVoting is IMembership, MajorityVotingBase {
         emit ProposalCreated(proposalId, _msgSender(), _startDate, _endDate, _metadata, _actions, _allowFailureMap);
     }
 
-    /// @dev This empty reserved space is put in place to allow future versions to add new
-    /// variables without shifting down storage in the inheritance chain.
-    /// https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-    uint256[47] private __gap;
 }

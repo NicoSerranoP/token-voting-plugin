@@ -13,7 +13,6 @@ import {IMajorityVoting} from "../src/base/IMajorityVoting.sol";
 import {VotingPowerCondition} from "../src/condition/VotingPowerCondition.sol";
 import {IPlugin} from "@aragon/osx-commons-contracts/src/plugin/IPlugin.sol";
 import {Executor} from "@aragon/osx-commons-contracts/src/executors/Executor.sol";
-import {PluginUUPSUpgradeable} from "@aragon/osx-commons-contracts/src/plugin/PluginUUPSUpgradeable.sol";
 import {IProtocolVersion} from "@aragon/osx-commons-contracts/src/utils/versioning/IProtocolVersion.sol";
 import {IMembership} from "@aragon/osx-commons-contracts/src/plugin/extensions/membership/IMembership.sol";
 import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
@@ -56,7 +55,7 @@ contract TokenVotingTest is TestBase {
         // GIVEN an already initialized plugin
         // WHEN calling initialize again
         // THEN it reverts
-        vm.expectRevert(PluginUUPSUpgradeable.AlreadyInitialized.selector);
+        vm.expectRevert("Initializable: contract is already initialized");
         plugin.initialize(
             dao,
             MajorityVotingBase.VotingSettings({

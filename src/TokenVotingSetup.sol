@@ -15,7 +15,7 @@ import {IDAO} from "@aragon/osx-commons-contracts/src/dao/IDAO.sol";
 import {PermissionLib} from "@aragon/osx-commons-contracts/src/permission/PermissionLib.sol";
 import {IPlugin} from "@aragon/osx-commons-contracts/src/plugin/IPlugin.sol";
 import {IPluginSetup} from "@aragon/osx-commons-contracts/src/plugin/setup/IPluginSetup.sol";
-import {PluginUpgradeableSetup} from "@aragon/osx-commons-contracts/src/plugin/setup/PluginUpgradeableSetup.sol";
+import {PluginSetup} from "@aragon/osx-commons-contracts/src/plugin/setup/PluginSetup.sol";
 
 import {MajorityVotingBase} from "./base/MajorityVotingBase.sol";
 import {TokenVoting} from "./TokenVoting.sol";
@@ -29,7 +29,7 @@ import {VotingPowerCondition} from "./condition/VotingPowerCondition.sol";
 /// @notice The setup contract of the `TokenVoting` plugin.
 /// @dev v1.4 (Release 1, Build 4)
 /// @custom:security-contact sirt@aragon.org
-contract TokenVotingSetup is PluginUpgradeableSetup {
+contract TokenVotingSetup is PluginSetup {
     using Address for address;
     using Clones for address;
     using ERC165Checker for address;
@@ -43,9 +43,6 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
 
     /// @notice The ID of the permission required to call the `setMetadata` function.
     bytes32 private constant SET_METADATA_PERMISSION_ID = keccak256("SET_METADATA_PERMISSION");
-
-    /// @notice The ID of the permission required to call the `upgradeToAndCall` function.
-    bytes32 private constant UPGRADE_PLUGIN_PERMISSION_ID = keccak256("UPGRADE_PLUGIN_PERMISSION");
 
     /// @notice The ID of the permission required to call the `execute` function.
     bytes32 private constant EXECUTE_PROPOSAL_PERMISSION_ID = keccak256("EXECUTE_PROPOSAL_PERMISSION");
@@ -97,7 +94,7 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
         TokenVoting _tokenVotingBase,
         GovernanceERC20 _governanceERC20Base,
         GovernanceWrappedERC20 _governanceWrappedERC20Base
-    ) PluginUpgradeableSetup(address(_tokenVotingBase)) {
+    ) PluginSetup(address(_tokenVotingBase)) {
         if (address(_tokenVotingBase) == address(0)) revert InvalidImplementation();
         if (address(_governanceERC20Base) == address(0)) revert InvalidImplementation();
         if (address(_governanceWrappedERC20Base) == address(0)) revert InvalidImplementation();
@@ -164,7 +161,7 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
             }
 
             // Prepare and deploy plugin proxy.
-            plugin = address(tokenVotingBase).deployUUPSProxy(
+            plugin = address(tokenVotingBase).deployMinimalProxy(
                 abi.encodeCall(
                     TokenVoting.initialize,
                     (
@@ -252,66 +249,6 @@ contract TokenVotingSetup is PluginUpgradeableSetup {
         }
 
         preparedSetupData.permissions = permissions;
-    }
-
-    /// @inheritdoc IPluginSetup
-    /// @dev Revoke the upgrade plugin permission to the DAO for all builds prior the current one (3).
-    function prepareUpdate(address _dao, uint16 _fromBuild, SetupPayload calldata _payload)
-        external
-        override
-        returns (bytes memory initData, PreparedSetupData memory preparedSetupData)
-    {
-        if (_fromBuild < 3) {
-            address votingPowerCondition = address(new VotingPowerCondition(_payload.plugin));
-
-            PermissionLib.MultiTargetPermission[] memory permissions = new PermissionLib.MultiTargetPermission[](5);
-
-            permissions[0] = PermissionLib.MultiTargetPermission({
-                operation: PermissionLib.Operation.Revoke,
-                where: _payload.plugin,
-                who: _dao,
-                condition: PermissionLib.NO_CONDITION,
-                permissionId: UPGRADE_PLUGIN_PERMISSION_ID
-            });
-
-            permissions[1] = PermissionLib.MultiTargetPermission(
-                PermissionLib.Operation.GrantWithCondition,
-                _payload.plugin,
-                ANY_ADDR, // ANY_ADDR
-                votingPowerCondition,
-                tokenVotingBase.CREATE_PROPOSAL_PERMISSION_ID()
-            );
-
-            permissions[2] = PermissionLib.MultiTargetPermission({
-                operation: PermissionLib.Operation.Grant,
-                where: _payload.plugin,
-                who: _dao,
-                condition: PermissionLib.NO_CONDITION,
-                permissionId: SET_TARGET_CONFIG_PERMISSION_ID
-            });
-
-            permissions[3] = PermissionLib.MultiTargetPermission({
-                operation: PermissionLib.Operation.Grant,
-                where: _payload.plugin,
-                who: _dao,
-                condition: PermissionLib.NO_CONDITION,
-                permissionId: SET_METADATA_PERMISSION_ID
-            });
-
-            permissions[4] = PermissionLib.MultiTargetPermission({
-                operation: PermissionLib.Operation.Grant,
-                where: _payload.plugin,
-                who: ANY_ADDR,
-                condition: PermissionLib.NO_CONDITION,
-                permissionId: EXECUTE_PROPOSAL_PERMISSION_ID
-            });
-
-            preparedSetupData.permissions = permissions;
-            preparedSetupData.helpers = new address[](1);
-            preparedSetupData.helpers[0] = votingPowerCondition;
-
-            initData = abi.encodeCall(TokenVoting.initializeFrom, (_fromBuild, _payload.data));
-        }
     }
 
     /// @inheritdoc IPluginSetup

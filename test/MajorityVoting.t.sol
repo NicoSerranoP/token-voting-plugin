@@ -30,7 +30,6 @@ contract MajorityVotingBaseTest is TestBase {
         ^ MajorityVotingBase.updateVotingSettings.selector ^ MajorityVotingBase.updateMinApprovals.selector
         ^ bytes4(keccak256("createProposal(bytes,(address,uint256,bytes)[],uint256,uint64,uint64,uint8,bool)"));
 
-    error AlreadyInitialized();
 
     function setUp() public {
         SimpleBuilder builder = new SimpleBuilder();
@@ -51,7 +50,7 @@ contract MajorityVotingBaseTest is TestBase {
 
     function test_WhenCallingInitialize() external givenTheContractIsAlreadyInitialized {
         // It reverts if trying to re-initialize
-        vm.expectRevert(abi.encodeWithSelector(AlreadyInitialized.selector));
+        vm.expectRevert("Initializable: contract is already initialized");
         plugin.initialize(
             dao,
             MajorityVotingBase.VotingSettings({
