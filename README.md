@@ -5,34 +5,6 @@
 [license]: https://opensource.org/licenses/AGPL-v3
 [license-badge]: https://img.shields.io/badge/License-AGPL_v3-blue.svg
 
-## Audit
-
-### v1.4
-
-**Halborn**: [audit report](./audits/halborn-audit-1-4-remediated.pdf)
-
-- Commit ID: [590ebd8d5931cb6811ea55ca9e6e3f96df6969b3](https://github.com/aragon/token-voting-plugin/commit/590ebd8d5931cb6811ea55ca9e6e3f96df6969b3)
-- Started: July 11th, 2025
-- Finished: July 14th, 2025
-- Updated: September 29th, 2025
-
-### v1.3
-
-TokenVoting v1.4 has been ported to Foundry.
-
-The HardHat codebase of version 1.3 and earlier can be found [in this repo](https://github.com/aragon/token-voting-plugin-hardhat).
-
-**Halborn**: [audit report](https://github.com/aragon/osx/tree/main/audits/Halborn_AragonOSx_v1_4_Smart_Contract_Security_Assessment_Report_2025_01_03.pdf)
-
-- Commit ID: [02a7dbb95c42ebd2226117bf85a0fe330c788948](https://github.com/aragon/token-voting-plugin-hardhat/commit/02a7dbb95c42ebd2226117bf85a0fe330c788948)
-- Started: 2024-11-18
-- Finished: 2025-02-13
-
-## ABI and artifacts
-
-Check out the [artifacts folder](./npm-artifacts/README.md) to get the deployed addresses and the contract ABI's.
-
-
 ## Features
 
 TokenVoting is an Aragon OSx Plugin, designed to conduct governance processes where the voting power of each member is determined by an [IVotes compatible token](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/utils/IVotes.sol).
@@ -62,19 +34,11 @@ Other features:
 ├── remappings.txt
 ├── lib
 │   └── just-foundry      # shared just recipes + network configs (submodule)
-├── npm-artifacts
-│   └── src
-│       ├── abi.ts
-│       └── addresses.json
 ├── script
-│   ├── DeployNewTokenVotingRepo.s.sol
-│   ├── DeployTokenVoting_1_4.s.sol
-│   ├── EncodeUpgradeProposal.sol
-│   └── verify-contracts.sh
+│   └── InstallTokenVoting.s.sol   # installs the plugin onto a new or existing DAO
 ├── src
 │   ├── TokenVoting.sol
-│   ├── TokenVotingSetup.sol
-│   ├── TokenVotingSetupZkSync.sol
+│   ├── TokenVotingSetup.sol       # the plugin's PluginSetup, for installs via the Aragon App/PSP
 │   ├── base
 │   │   ├── IMajorityVoting.sol
 │   │   └── MajorityVotingBase.sol
@@ -86,6 +50,11 @@ Other features:
 │       ├── IERC20MintableUpgradeable.sol
 │       └── IGovernanceWrappedERC20.sol
 └── test
+    ├── *.t.sol            # unit tests
+    ├── builders            # test DAO builders (SimpleBuilder, ForkBuilder)
+    ├── fork-tests           # e2e tests against a real OSx deployment (DAOFactory) on a fork
+    ├── lib
+    └── mocks
 ```
 
 ## Prerequisites
@@ -105,7 +74,7 @@ git clone --recurse-submodules <repo-url>
 just init          # defaults to mainnet, e.g. `just init sepolia`
 ```
 
-`just init` fetches submodules, creates `.env` from `.env.example`, and selects the network. Edit `.env` to add your secrets (`DEPLOYER_KEY`, `ETHERSCAN_API_KEY`, `PINATA_JWT`, …). Alternatively, resolve them with the [`vars`](https://github.com/vars-cli/vars) secret manager — the keys this project needs are declared in [`.vars.yaml`](./.vars.yaml), and just-foundry's recipes call `vars resolve` automatically when `vars` is installed.
+`just init` fetches submodules, creates `.env` from `.env.example`, and selects the network. Edit `.env` to add your secrets (`DEPLOYER_KEY`, `ETHERSCAN_API_KEY`, …) and the install settings described below. Alternatively, resolve them with the [`vars`](https://github.com/vars-cli/vars) secret manager — the keys this project needs are declared in [`.vars.yaml`](./.vars.yaml), and just-foundry's recipes call `vars resolve` automatically when `vars` is installed.
 
 Network settings (RPC URL, chain id, verifier, and the Aragon OSx addresses) come from `lib/just-foundry/networks/<network>.env` — switch with `just switch <network>`, inspect the resolved values with `just env`, and create a local editable copy with `just switch <network> override`.
 
@@ -120,17 +89,13 @@ init network="mainnet"       Fetch submodules, scaffold .env and select the netw
 switch network override=""   Select the active network
 setup                        Install Foundry
 
-[metadata]
-pin-metadata                 Pin the release & build metadata to IPFS
-upgrade-proposal             Encode & print the calldata to create the upgrade proposal
-
 [script]
-predeploy                    Dry-run the deploy script (no broadcast)
+predeploy                    Dry-run the install script (no broadcast)
 deploy *args                 Run tests, then broadcast + verify
 
 [test]
 test *args                   Run unit tests (fork tests excluded)
-test-fork *args              Run fork tests (requires RPC_URL)
+test-fork *args               Run fork tests (requires RPC_URL)
 test-coverage                Generate an HTML coverage report under ./report
 
 [verification]
@@ -157,11 +122,16 @@ just test-fork     # fork tests (requires a reachable RPC_URL for the active net
 just test-coverage # HTML coverage report under ./report
 ```
 
-`just test` checks the logic's accordance to the specs; `just test-fork` additionally requires `RPC_URL` (from the selected network or `.env`).
+`just test` checks the logic's accordance to the specs; `just test-fork` additionally requires `RPC_URL` (from the selected network or `.env`) and exercises the full install flow (`script/InstallTokenVoting.s.sol`) against a real `DAOFactory` on a fork, including a full create → vote → execute proposal cycle.
 
-## Deployment 🚀
+## Installing the plugin
 
-Select the target network, then simulate and deploy:
+`script/InstallTokenVoting.s.sol` deploys and initializes the `TokenVoting` plugin directly (no `PluginSetupProcessor`/`PluginRepo` involved) and wires up the same permissions the plugin's own `TokenVotingSetup.prepareInstallation` would grant. It supports two flows, selected by `EXISTING_DAO_ADDRESS`:
+
+- **New DAO** (default, `EXISTING_DAO_ADDRESS` unset): creates a DAO via Aragon's `DAOFactory` and installs the plugin on it in the same run.
+- **Existing DAO** (`EXISTING_DAO_ADDRESS` set): installs onto an already-deployed DAO. This requires the deployer key to already hold `EXECUTE_PERMISSION_ID` on that DAO — installing into an existing, fully decentralized DAO otherwise requires a governance proposal instead of a direct broadcast transaction.
+
+All install parameters (token, voting settings, target config, …) are read from environment variables — see the "INSTALL SETTINGS" section in [`.env.example`](./.env.example) for the full list and their defaults.
 
 ```sh
 just switch <network>
@@ -178,14 +148,9 @@ When running a production deployment ceremony, you can use these steps as a refe
   - [ ] I have run `docker run --rm -it -v .:/deployment debian:bookworm-slim`
   - [ ] I have run `apt update && apt install -y curl git vim neovim bc`
   - [ ] I have installed `just` (`curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin`)
-  - On **standard EVM networks**:
-    - [ ] I have run `curl -L https://foundry.paradigm.xyz | bash`
-    - [ ] I have run `source /root/.bashrc`
-    - [ ] I have run `foundryup`
-  - On **ZkSync networks**:
-    - [ ] I have run `curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash`
-    - [ ] I have run `source /root/.bashrc`
-    - [ ] I have run `foundryup-zksync`
+  - [ ] I have run `curl -L https://foundry.paradigm.xyz | bash`
+  - [ ] I have run `source /root/.bashrc`
+  - [ ] I have run `foundryup`
   - [ ] I have run `cd /deployment`
   - [ ] I have run `just init <network>`
 - [ ] I am opening an editor on the `/deployment` folder, within the Docker container
@@ -193,7 +158,7 @@ When running a production deployment ceremony, you can use these steps as a refe
   - [ ] I have created a new burner wallet with `cast wallet new` and copied the private key to `DEPLOYER_KEY` within `.env`
   - [ ] I have selected the correct network with `just switch <network>` (this sets RPC_URL, CHAIN_ID and the verifier)
   - [ ] I have set `ETHERSCAN_API_KEY` or `BLOCKSCOUT_HOST_NAME` (when relevant to the target network)
-  - [ ] (TO DO: Add a step to check your own variables here)
+  - [ ] I have set the install settings (`EXISTING_DAO_ADDRESS` or new-DAO/token/voting settings) as described above
   - [ ] I have run `just env` and confirmed the resolved values
   - [ ] I am the only person of the ceremony that will operate the deployment wallet
 - [ ] All the tests run clean (`just test`)
@@ -216,14 +181,13 @@ When running a production deployment ceremony, you can use these steps as a refe
 ### Post deployment checklist
 
 - [ ] The deployment process completed with no errors
-- [ ] The factory contract was deployed by the deployment address
 - [ ] All the project's smart contracts are correctly verified on the reference block explorer of the target network.
-- [ ] The output of the latest `logs/<script>-<network>-<timestamp>.log` file corresponds to the console output
-- [ ] A file called `artifacts/deployment-<network>-<timestamp>.json` has been created, and the addresses match those logged to the screen
+- [ ] The output of the latest `logs/InstallTokenVoting-<network>-<timestamp>.log` file corresponds to the console output
+- [ ] A file called `artifacts/install-<network>-<timestamp>.json` has been created, and the addresses match those logged to the screen
 - [ ] I have uploaded the following files to a shared location:
-  - `logs/<script>-<network>-<timestamp>.log` (the last one)
-  - `artifacts/deployment-<network>-<timestamp>.json`  (the last one)
-  - `broadcast/DeployTokenVoting_*.s.sol/<chain-id>/run-<timestamp>.json` (the last one, or `run-latest.json`)
+  - `logs/InstallTokenVoting-<network>-<timestamp>.log` (the last one)
+  - `artifacts/install-<network>-<timestamp>.json`  (the last one)
+  - `broadcast/InstallTokenVoting.s.sol/<chain-id>/run-<timestamp>.json` (the last one, or `run-latest.json`)
 - [ ] The rest of members confirm that the values are correct
 - [ ] I have transferred the remaining funds of the deployment wallet to the address that originally funded it
   - `just refund`
@@ -242,7 +206,7 @@ just verify blockscout
 just verify sourcify
 ```
 
-These use the last deployment data under `broadcast/DeployTokenVoting_*.s.sol/<chain-id>/run-latest.json`.
+These use the last deployment data under `broadcast/InstallTokenVoting.s.sol/<chain-id>/run-latest.json`.
 - Ensure that the required variables are set within the `.env` file (or the active network).
 
 This flow will attempt to verify all the contracts in one go, but you may still need to issue additional manual verifications, depending on the circumstances.

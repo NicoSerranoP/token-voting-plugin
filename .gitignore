@@ -23,4 +23,3 @@ broadcast/*
 broadcast/*/31337/
 
 artifacts
-script/metadata/upgrade-proposal-metadata.json

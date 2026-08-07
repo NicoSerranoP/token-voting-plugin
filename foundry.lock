@@ -16,8 +16,5 @@
   },
   "lib/osx-commons": {
     "rev": "869045b069679fad94d640a8a3e1a1b5538cf0f0"
-  },
-  "lib/plugin-version-1.3": {
-    "rev": "44c445e5b084bb4b225ab5006427a99727cdd0b8"
   }
 }

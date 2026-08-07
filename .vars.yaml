@@ -5,5 +5,4 @@
 keys:
   - DEPLOYER_KEY
   - ETHERSCAN_API_KEY
-  - PINATA_JWT
   # - RPC_URL          # optional: override the network's default RPC with a private endpoint
