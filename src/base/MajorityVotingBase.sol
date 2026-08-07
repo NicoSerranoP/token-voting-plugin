@@ -286,6 +286,13 @@ abstract contract MajorityVotingBase is
     /// @param minApprovals The minimum amount of yes votes needed for a proposal succeed.
     event VotingMinApprovalUpdated(uint256 minApprovals);
 
+    modifier onlyIfProposalExists(uint256 _proposalId) {
+        if (!_proposalExists(_proposalId)) {
+            revert NonexistentProposal(_proposalId);
+        }
+        _;
+    }
+
     /// @notice Initializes the component to be used by inheriting contracts.
     /// @dev This method is required to support [ERC-1822](https://eips.ethereum.org/EIPS/eip-1822).
     /// @param _dao The IDAO interface of the associated DAO.
@@ -362,37 +369,36 @@ abstract contract MajorityVotingBase is
     }
 
     /// @inheritdoc IMajorityVoting
-    /// @dev Reverts if the proposal with the given `_proposalId` does not exist.
     function canVote(uint256 _proposalId, address _account, VoteOption _voteOption)
         public
         view
         virtual
+        onlyIfProposalExists(_proposalId)
         returns (bool)
     {
-        if (!_proposalExists(_proposalId)) {
-            revert NonexistentProposal(_proposalId);
-        }
-
         return _canVote(_proposalId, _account, _voteOption);
     }
 
     /// @inheritdoc IMajorityVoting
-    /// @dev Reverts if the proposal with the given `_proposalId` does not exist.
-    function canExecute(uint256 _proposalId) public view virtual override(IMajorityVoting, IProposal) returns (bool) {
-        if (!_proposalExists(_proposalId)) {
-            revert NonexistentProposal(_proposalId);
-        }
-
+    function canExecute(uint256 _proposalId)
+        public
+        view
+        virtual
+        onlyIfProposalExists(_proposalId)
+        override(IMajorityVoting, IProposal)
+        returns (bool)
+    {
         return _canExecute(_proposalId);
     }
 
     /// @inheritdoc IProposal
-    /// @dev Reverts if the proposal with the given `_proposalId` does not exist.
-    function hasSucceeded(uint256 _proposalId) public view virtual returns (bool) {
-        if (!_proposalExists(_proposalId)) {
-            revert NonexistentProposal(_proposalId);
-        }
-
+    function hasSucceeded(uint256 _proposalId)
+        public
+        view
+        virtual
+        onlyIfProposalExists(_proposalId)
+        returns (bool)
+    {
         Proposal storage proposal_ = proposals[_proposalId];
         bool isProposalOpen = _isProposalOpen(proposal_);
 
