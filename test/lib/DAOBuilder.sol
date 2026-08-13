@@ -13,7 +13,7 @@ import {ProxyLib} from "@aragon/osx-commons-contracts/src/utils/deployment/Proxy
 import {IPlugin} from "@aragon/osx-commons-contracts/src/plugin/IPlugin.sol";
 import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
 
-contract SimpleBuilder is TestBase {
+contract DAOBuilder is TestBase {
     address immutable DAO_BASE = address(new DAO());
     address immutable TOKEN_VOTING_PLUGIN_BASE = address(new TokenVoting());
     address private constant ANY_ADDR = address(type(uint160).max);
@@ -44,54 +44,54 @@ contract SimpleBuilder is TestBase {
     }
 
     // Override methods
-    function withDaoOwner(address _newOwner) public returns (SimpleBuilder) {
+    function withDaoOwner(address _newOwner) public returns (DAOBuilder) {
         daoOwner = _newOwner;
         return this;
     }
 
-    function withEarlyExecution() public returns (SimpleBuilder) {
+    function withEarlyExecution() public returns (DAOBuilder) {
         votingMode = IMajorityVoting.VotingMode.EarlyExecution;
         return this;
     }
 
-    function withVoteReplacement() public returns (SimpleBuilder) {
+    function withVoteReplacement() public returns (DAOBuilder) {
         votingMode = IMajorityVoting.VotingMode.VoteReplacement;
         return this;
     }
 
-    function withSupportThreshold(uint32 _newThreshold) public returns (SimpleBuilder) {
+    function withSupportThreshold(uint32 _newThreshold) public returns (DAOBuilder) {
         supportThreshold = _newThreshold;
         return this;
     }
 
-    function withMinParticipation(uint32 _newValue) public returns (SimpleBuilder) {
+    function withMinParticipation(uint32 _newValue) public returns (DAOBuilder) {
         minParticipation = _newValue;
         return this;
     }
 
-    function withMinDuration(uint64 _newValue) public returns (SimpleBuilder) {
+    function withMinDuration(uint64 _newValue) public returns (DAOBuilder) {
         minDuration = _newValue;
         return this;
     }
 
-    function withMinApprovals(uint64 _newValue) public returns (SimpleBuilder) {
+    function withMinApprovals(uint64 _newValue) public returns (DAOBuilder) {
         minApprovals = _newValue;
         return this;
     }
 
-    function withMinProposerVotingPower(uint256 _newValue) public returns (SimpleBuilder) {
+    function withMinProposerVotingPower(uint256 _newValue) public returns (DAOBuilder) {
         minProposerVotingPower = _newValue;
         return this;
     }
 
     // Use the given token
-    function withToken(IVotesUpgradeable _newToken) public returns (SimpleBuilder) {
+    function withToken(IVotesUpgradeable _newToken) public returns (DAOBuilder) {
         token = _newToken;
         return this;
     }
 
     // A list of token holders, all with the same balance
-    function withNewToken(address[] memory _holders, uint256 _balance) public returns (SimpleBuilder) {
+    function withNewToken(address[] memory _holders, uint256 _balance) public returns (DAOBuilder) {
         for (uint256 i = 0; i < _holders.length; i++) {
             newTokenHolders.push(_holders[i]);
             newTokenBalances.push(_balance);
@@ -100,7 +100,7 @@ contract SimpleBuilder is TestBase {
     }
 
     // A list of token holders, each with their own balance
-    function withNewToken(address[] memory _holders, uint256[] memory _balances) public returns (SimpleBuilder) {
+    function withNewToken(address[] memory _holders, uint256[] memory _balances) public returns (DAOBuilder) {
         for (uint256 i = 0; i < _holders.length; i++) {
             newTokenHolders.push(_holders[i]);
             newTokenBalances.push(_balances[i]);
@@ -108,28 +108,28 @@ contract SimpleBuilder is TestBase {
         return this;
     }
 
-    function withTargetConfig(address _target, IPlugin.Operation _operation) public returns (SimpleBuilder) {
+    function withTargetConfig(address _target, IPlugin.Operation _operation) public returns (DAOBuilder) {
         targetAddress = _target;
         targetOperation = _operation;
         return this;
     }
 
-    function withPluginMetadata(bytes memory _newValue) public returns (SimpleBuilder) {
+    function withPluginMetadata(bytes memory _newValue) public returns (DAOBuilder) {
         pluginMetadata = _newValue;
         return this;
     }
 
-    function withExcludedAccount(address account) public returns (SimpleBuilder) {
+    function withExcludedAccount(address account) public returns (DAOBuilder) {
         excludedAccounts.push(account);
         return this;
     }
 
-    function withSelfDelegationOnMint() public returns (SimpleBuilder) {
+    function withSelfDelegationOnMint() public returns (DAOBuilder) {
         selfDelegateOnMint = true;
         return this;
     }
 
-    function withoutSelfDelegationOnMint() public returns (SimpleBuilder) {
+    function withoutSelfDelegationOnMint() public returns (DAOBuilder) {
         selfDelegateOnMint = false;
         return this;
     }

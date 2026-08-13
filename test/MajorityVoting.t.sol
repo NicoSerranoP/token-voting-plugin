@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.28;
 
-import {SimpleBuilder} from "./builders/SimpleBuilder.sol";
 import {TestBase} from "./lib/TestBase.sol";
+import {DAOBuilder} from "./lib/DAOBuilder.sol";
 import {DAO} from "@aragon/osx/core/dao/DAO.sol";
 import {TokenVoting} from "../src/TokenVoting.sol";
 import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
@@ -32,7 +32,7 @@ contract MajorityVotingBaseTest is TestBase {
 
 
     function setUp() public {
-        SimpleBuilder builder = new SimpleBuilder();
+        DAOBuilder builder = new DAOBuilder();
         (dao, plugin, token, condition) = builder.build();
 
         defaultNewVotingSettings = MajorityVotingBase.VotingSettings({

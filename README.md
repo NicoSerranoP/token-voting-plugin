@@ -51,7 +51,6 @@ Other features:
 │       └── IGovernanceWrappedERC20.sol
 └── test
     ├── *.t.sol            # unit tests
-    ├── builders            # test DAO builders (SimpleBuilder, ForkBuilder)
     ├── fork-tests           # e2e tests against a real OSx deployment (DAOFactory) on a fork
     ├── lib
     └── mocks
