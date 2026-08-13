@@ -22,7 +22,7 @@ contract MajorityVotingBaseTest is TestBase {
     TokenVoting internal plugin;
     IVotesUpgradeable internal token;
     VotingPowerCondition internal condition;
-    MajorityVotingBase.VotingSettings internal defaultNewVotingSettings;
+    IMajorityVoting.VotingSettings internal defaultNewVotingSettings;
 
     bytes4 internal constant MAJORITY_VOTING_BASE_INTERFACE_ID = MajorityVotingBase.minDuration.selector
         ^ MajorityVotingBase.minProposerVotingPower.selector ^ MajorityVotingBase.votingMode.selector
@@ -35,7 +35,7 @@ contract MajorityVotingBaseTest is TestBase {
         DAOBuilder builder = new DAOBuilder();
         (dao, plugin, token, condition) = builder.build();
 
-        defaultNewVotingSettings = MajorityVotingBase.VotingSettings({
+        defaultNewVotingSettings = IMajorityVoting.VotingSettings({
             votingMode: IMajorityVoting.VotingMode.EarlyExecution,
             supportThreshold: 500_000,
             minParticipation: 200_000,
@@ -53,7 +53,7 @@ contract MajorityVotingBaseTest is TestBase {
         vm.expectRevert("Initializable: contract is already initialized");
         plugin.initialize(
             dao,
-            MajorityVotingBase.VotingSettings({
+            IMajorityVoting.VotingSettings({
                 votingMode: IMajorityVoting.VotingMode.Standard,
                 supportThreshold: 500_000,
                 minParticipation: 100_000,
@@ -234,7 +234,7 @@ contract MajorityVotingBaseTest is TestBase {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.MinDurationOutOfBounds.selector, 1 hours, defaultNewVotingSettings.minDuration
+                IMajorityVoting.MinDurationOutOfBounds.selector, 1 hours, defaultNewVotingSettings.minDuration
             )
         );
         plugin.updateVotingSettings(defaultNewVotingSettings);
@@ -249,7 +249,7 @@ contract MajorityVotingBaseTest is TestBase {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.MinDurationOutOfBounds.selector, 365 days, defaultNewVotingSettings.minDuration
+                IMajorityVoting.MinDurationOutOfBounds.selector, 365 days, defaultNewVotingSettings.minDuration
             )
         );
         plugin.updateVotingSettings(defaultNewVotingSettings);
@@ -259,7 +259,7 @@ contract MajorityVotingBaseTest is TestBase {
         // It should change the voting settings successfully
 
         vm.expectEmit(true, true, true, true);
-        emit MajorityVotingBase.VotingSettingsUpdated(
+        emit IMajorityVoting.VotingSettingsUpdated(
             defaultNewVotingSettings.votingMode,
             defaultNewVotingSettings.supportThreshold,
             defaultNewVotingSettings.minParticipation,
@@ -331,7 +331,7 @@ contract MajorityVotingBaseTest is TestBase {
         uint256 newMinApproval = 100_000; // 10%
 
         vm.expectEmit(true, false, false, true);
-        emit MajorityVotingBase.VotingMinApprovalUpdated(newMinApproval);
+        emit IMajorityVoting.VotingMinApprovalUpdated(newMinApproval);
 
         plugin.updateMinApprovals(newMinApproval);
 

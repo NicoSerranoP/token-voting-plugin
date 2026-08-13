@@ -14,7 +14,6 @@ import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/
 
 import {TokenVoting} from "../src/TokenVoting.sol";
 import {IMajorityVoting} from "../src/base/IMajorityVoting.sol";
-import {MajorityVotingBase} from "../src/base/MajorityVotingBase.sol";
 import {GovernanceERC20} from "../src/erc20/GovernanceERC20.sol";
 import {VotingPowerCondition} from "../src/condition/VotingPowerCondition.sol";
 
@@ -23,7 +22,7 @@ import {VotingPowerCondition} from "../src/condition/VotingPowerCondition.sol";
 ///     deploying account. For a custom initial distribution, mint a token yourself first and
 ///     pass its address as `existingToken` instead.
 struct InstallParams {
-    MajorityVotingBase.VotingSettings votingSettings;
+    IMajorityVoting.VotingSettings votingSettings;
     address existingToken;
     string tokenName;
     string tokenSymbol;

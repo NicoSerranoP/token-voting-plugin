@@ -7,12 +7,12 @@ import {DAOBuilder} from "./lib/DAOBuilder.sol";
 import {DAO} from "@aragon/osx/core/dao/DAO.sol";
 import {DaoUnauthorized} from "@aragon/osx-commons-contracts/src/permission/auth/auth.sol";
 import {TokenVoting} from "../src/TokenVoting.sol";
-import {MajorityVotingBase, IProposal} from "../src/base/MajorityVotingBase.sol";
 import {Action} from "@aragon/osx-commons-contracts/src/executors/IExecutor.sol";
 import {IMajorityVoting} from "../src/base/IMajorityVoting.sol";
 import {VotingPowerCondition} from "../src/condition/VotingPowerCondition.sol";
 import {IPlugin} from "@aragon/osx-commons-contracts/src/plugin/IPlugin.sol";
 import {Executor} from "@aragon/osx-commons-contracts/src/executors/Executor.sol";
+import {IProposal} from "@aragon/osx-commons-contracts/src/plugin/extensions/proposal/IProposal.sol";
 import {IProtocolVersion} from "@aragon/osx-commons-contracts/src/utils/versioning/IProtocolVersion.sol";
 import {IMembership} from "@aragon/osx-commons-contracts/src/plugin/extensions/membership/IMembership.sol";
 import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
@@ -58,7 +58,7 @@ contract TokenVotingTest is TestBase {
         vm.expectRevert("Initializable: contract is already initialized");
         plugin.initialize(
             dao,
-            MajorityVotingBase.VotingSettings({
+            IMajorityVoting.VotingSettings({
                 votingMode: IMajorityVoting.VotingMode.Standard,
                 supportThreshold: 500_000,
                 minParticipation: 100_000,
@@ -83,7 +83,7 @@ contract TokenVotingTest is TestBase {
         plugin = TokenVoting(proxy);
 
         // WHEN calling initialize
-        MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
+        IMajorityVoting.VotingSettings memory settings = IMajorityVoting.VotingSettings({
             votingMode: IMajorityVoting.VotingMode.EarlyExecution,
             supportThreshold: 400_000, // 40%
             minParticipation: 200_000, // 20%
@@ -132,7 +132,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(alice);
         uint256 proposalId = plugin.createProposal("", new Action[](0), 0, 0, bytes(""));
 
-        (,, MajorityVotingBase.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
         assertEq(parameters.snapshotTimepoint, block.number - 1);
 
         // 2
@@ -162,7 +162,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(alice);
         uint256 proposalId = plugin.createProposal("", new Action[](0), 0, 0, bytes(""));
 
-        (,, MajorityVotingBase.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
         assertEq(parameters.snapshotTimepoint, 499999);
     }
 
@@ -182,7 +182,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(alice);
         uint256 proposalId = plugin.createProposal("", new Action[](0), 0, 0, bytes(""));
 
-        (,, MajorityVotingBase.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory parameters,,,,) = plugin.getProposal(proposalId);
         assertEq(parameters.snapshotTimepoint, 699);
     }
 
@@ -226,7 +226,7 @@ contract TokenVotingTest is TestBase {
 
             address proxy = ProxyLib.deployUUPSProxy(base, "");
             MyTokenVoting myPlugin = MyTokenVoting(proxy);
-            MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
+            IMajorityVoting.VotingSettings memory settings = IMajorityVoting.VotingSettings({
                 votingMode: IMajorityVoting.VotingMode.EarlyExecution,
                 supportThreshold: 400_000, // 40%
                 minParticipation: 200_000, // 20%
@@ -282,7 +282,7 @@ contract TokenVotingTest is TestBase {
 
         address proxy = ProxyLib.deployUUPSProxy(base, "");
         MyTokenVoting myPlugin = MyTokenVoting(proxy);
-        MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
+        IMajorityVoting.VotingSettings memory settings = IMajorityVoting.VotingSettings({
             votingMode: IMajorityVoting.VotingMode.EarlyExecution,
             supportThreshold: 400_000, // 40%
             minParticipation: 200_000, // 20%
@@ -517,7 +517,7 @@ contract TokenVotingTest is TestBase {
         dao.grant(address(plugin), address(this), keccak256("CREATE_PROPOSAL_PERMISSION"));
         uint256 proposalId = plugin.createProposal("meta", new Action[](0), 0, 0, "");
 
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         assertEq(params.minVotingPower, 3 ether);
     }
 
@@ -713,7 +713,7 @@ contract TokenVotingTest is TestBase {
         uint64 invalidStartDate = uint64(block.timestamp - 1);
         vm.prank(alice);
         vm.expectRevert(
-            abi.encodeWithSelector(MajorityVotingBase.DateOutOfBounds.selector, block.timestamp, invalidStartDate)
+            abi.encodeWithSelector(IMajorityVoting.DateOutOfBounds.selector, block.timestamp, invalidStartDate)
         );
         plugin.createProposal("0x", new Action[](0), 0, invalidStartDate, 0, IMajorityVoting.VoteOption.None, false);
     }
@@ -740,7 +740,7 @@ contract TokenVotingTest is TestBase {
         uint64 invalidEndDate = startDate + uint64(plugin.minDuration() - 1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.DateOutOfBounds.selector, startDate + plugin.minDuration(), invalidEndDate
+                IMajorityVoting.DateOutOfBounds.selector, startDate + plugin.minDuration(), invalidEndDate
             )
         );
         vm.prank(alice);
@@ -755,7 +755,7 @@ contract TokenVotingTest is TestBase {
 
         // It sets the startDate to now and endDate to startDate + minDuration, if zeros are provided as an inputs
         uint256 proposalId = _createDummyProposal(alice);
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
 
         assertEq(params.startDate, block.timestamp);
         assertEq(params.endDate, block.timestamp + plugin.minDuration());
@@ -769,7 +769,7 @@ contract TokenVotingTest is TestBase {
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         uint256 proposalId = _createDummyProposal(alice);
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
 
         assertEq(params.minVotingPower, 4);
     }
@@ -785,7 +785,7 @@ contract TokenVotingTest is TestBase {
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
 
         uint256 proposalId = _createDummyProposal(alice);
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
 
         assertEq(params.minVotingPower, 0.25 ether);
     }
@@ -799,7 +799,7 @@ contract TokenVotingTest is TestBase {
         uint256 proposalId =
             plugin.createProposal("0x", new Action[](0), 0, 0, 0, IMajorityVoting.VoteOption.None, false);
 
-        (,,, MajorityVotingBase.Tally memory tally,,,) = plugin.getProposal(proposalId);
+        (,,, IMajorityVoting.Tally memory tally,,,) = plugin.getProposal(proposalId);
         assertEq(tally.yes, 0);
         assertEq(tally.no, 0);
         assertEq(tally.abstain, 0);
@@ -821,7 +821,7 @@ contract TokenVotingTest is TestBase {
         uint256 proposalId =
             plugin.createProposal("0x", new Action[](0), 0, 0, 0, IMajorityVoting.VoteOption.Yes, false);
 
-        (,,, MajorityVotingBase.Tally memory tally,,,) = plugin.getProposal(proposalId);
+        (,,, IMajorityVoting.Tally memory tally,,,) = plugin.getProposal(proposalId);
         assertEq(tally.yes, 1 ether);
         assertEq(uint256(plugin.getVoteOption(proposalId, alice)), uint256(IMajorityVoting.VoteOption.Yes));
     }
@@ -834,7 +834,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, PID_1, alice, IMajorityVoting.VoteOption.Yes
+                IMajorityVoting.VoteCastForbidden.selector, PID_1, alice, IMajorityVoting.VoteOption.Yes
             )
         );
         plugin.createProposal(
@@ -861,7 +861,7 @@ contract TokenVotingTest is TestBase {
 
     function test_WhenInteractingWithANonexistentProposal() external givenInTheStandardVotingMode {
         // It reverts if proposal does not exist
-        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.NonexistentProposal.selector, 999));
+        vm.expectRevert(abi.encodeWithSelector(IMajorityVoting.NonexistentProposal.selector, 999));
         plugin.canExecute(999);
     }
 
@@ -873,7 +873,7 @@ contract TokenVotingTest is TestBase {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(100), IMajorityVoting.VoteOption.Yes
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, vm.addr(100), IMajorityVoting.VoteOption.Yes
             )
         );
         vm.prank(vm.addr(100));
@@ -886,7 +886,7 @@ contract TokenVotingTest is TestBase {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, david, IMajorityVoting.VoteOption.Yes
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, david, IMajorityVoting.VoteOption.Yes
             )
         );
         vm.prank(david); // David has 0 tokens
@@ -913,7 +913,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(103));
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Abstain, false);
 
-        (,,, MajorityVotingBase.Tally memory tally,,,) = plugin.getProposal(proposalId);
+        (,,, IMajorityVoting.Tally memory tally,,,) = plugin.getProposal(proposalId);
         assertEq(tally.yes, bal);
         assertEq(tally.no, bal);
         assertEq(tally.abstain, bal);
@@ -925,7 +925,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(101));
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.None
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.None
             )
         );
         plugin.vote(proposalId, IMajorityVoting.VoteOption.None, false);
@@ -940,7 +940,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(101));
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.No
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.No
             )
         );
         plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
@@ -973,7 +973,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(103));
         plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
 
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
 
         assertTrue(plugin.canExecute(proposalId));
@@ -1001,7 +1001,7 @@ contract TokenVotingTest is TestBase {
     function test_WhenTryingToExecuteAProposalThatIsNotYetDecided() external givenInTheStandardVotingMode {
         // It reverts if vote is not decided yet
         uint256 proposalId = _createDummyProposal(vm.addr(100));
-        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.ProposalExecutionForbidden.selector, proposalId));
+        vm.expectRevert(abi.encodeWithSelector(IMajorityVoting.ProposalExecutionForbidden.selector, proposalId));
         plugin.execute(proposalId);
     }
 
@@ -1015,7 +1015,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(103));
         plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
 
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
 
         dao.revoke(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID());
@@ -1050,7 +1050,7 @@ contract TokenVotingTest is TestBase {
 
     function test_WhenInteractingWithANonexistentProposal2() external givenInTheEarlyExecutionVotingMode {
         // It reverts if proposal does not exist
-        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.NonexistentProposal.selector, 999));
+        vm.expectRevert(abi.encodeWithSelector(IMajorityVoting.NonexistentProposal.selector, 999));
         plugin.hasSucceeded(999);
     }
 
@@ -1063,7 +1063,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(100));
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(100), IMajorityVoting.VoteOption.Yes
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, vm.addr(100), IMajorityVoting.VoteOption.Yes
             )
         );
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
@@ -1076,7 +1076,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(david); // David has 0 tokens
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, david, IMajorityVoting.VoteOption.Yes
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, david, IMajorityVoting.VoteOption.Yes
             )
         );
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
@@ -1102,7 +1102,7 @@ contract TokenVotingTest is TestBase {
         emit IMajorityVoting.VoteCast(proposalId, vm.addr(103), IMajorityVoting.VoteOption.Abstain, bal);
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Abstain, false);
 
-        (,,, MajorityVotingBase.Tally memory tally,,,) = plugin.getProposal(proposalId);
+        (,,, IMajorityVoting.Tally memory tally,,,) = plugin.getProposal(proposalId);
         assertEq(tally.yes, bal);
         assertEq(tally.no, bal);
         assertEq(tally.abstain, bal);
@@ -1114,7 +1114,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(101));
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.None
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.None
             )
         );
         plugin.vote(proposalId, IMajorityVoting.VoteOption.None, false);
@@ -1129,7 +1129,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(101));
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.No
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.No
             )
         );
         plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
@@ -1172,7 +1172,7 @@ contract TokenVotingTest is TestBase {
 
         assertFalse(plugin.canExecute(proposalId));
 
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
 
         assertTrue(plugin.canExecute(proposalId));
@@ -1186,7 +1186,7 @@ contract TokenVotingTest is TestBase {
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
 
         assertFalse(plugin.canExecute(proposalId));
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
         assertFalse(plugin.canExecute(proposalId));
     }
@@ -1237,7 +1237,7 @@ contract TokenVotingTest is TestBase {
     function test_WhenTryingToExecuteAProposalThatIsNotYetDecided2() external givenInTheEarlyExecutionVotingMode {
         // It reverts if vote is not decided yet
         uint256 proposalId = _createDummyProposal(vm.addr(100));
-        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.ProposalExecutionForbidden.selector, proposalId));
+        vm.expectRevert(abi.encodeWithSelector(IMajorityVoting.ProposalExecutionForbidden.selector, proposalId));
         plugin.execute(proposalId);
     }
 
@@ -1255,7 +1255,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(106));
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, true);
 
-        (,,, MajorityVotingBase.Tally memory tally,,,) = plugin.getProposal(proposalId);
+        (,,, IMajorityVoting.Tally memory tally,,,) = plugin.getProposal(proposalId);
         assertEq(tally.yes, 60 ether);
 
         (, bool executed,,,,,) = plugin.getProposal(proposalId);
@@ -1282,7 +1282,7 @@ contract TokenVotingTest is TestBase {
     }
 
     function test_WhenInteractingWithANonexistentProposal3() external givenInTheVoteReplacementVotingMode {
-        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.NonexistentProposal.selector, 999));
+        vm.expectRevert(abi.encodeWithSelector(IMajorityVoting.NonexistentProposal.selector, 999));
         plugin.canVote(999, alice, IMajorityVoting.VoteOption.Yes);
     }
 
@@ -1294,7 +1294,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(100));
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(100), IMajorityVoting.VoteOption.Yes
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, vm.addr(100), IMajorityVoting.VoteOption.Yes
             )
         );
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
@@ -1306,7 +1306,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(david); // David has 0 tokens
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, david, IMajorityVoting.VoteOption.Yes
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, david, IMajorityVoting.VoteOption.Yes
             )
         );
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
@@ -1323,7 +1323,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(103));
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Abstain, false);
 
-        (,,, MajorityVotingBase.Tally memory tally,,,) = plugin.getProposal(proposalId);
+        (,,, IMajorityVoting.Tally memory tally,,,) = plugin.getProposal(proposalId);
         assertEq(tally.yes, bal);
         assertEq(tally.no, bal);
         assertEq(tally.abstain, bal);
@@ -1334,7 +1334,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(101));
         vm.expectRevert(
             abi.encodeWithSelector(
-                MajorityVotingBase.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.None
+                IMajorityVoting.VoteCastForbidden.selector, proposalId, vm.addr(101), IMajorityVoting.VoteOption.None
             )
         );
         plugin.vote(proposalId, IMajorityVoting.VoteOption.None, false);
@@ -1347,19 +1347,19 @@ contract TokenVotingTest is TestBase {
 
         vm.startPrank(vm.addr(101));
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
-        (,,, MajorityVotingBase.Tally memory tally1,,,) = plugin.getProposal(proposalId);
+        (,,, IMajorityVoting.Tally memory tally1,,,) = plugin.getProposal(proposalId);
         assertEq(tally1.yes, bal);
         assertEq(tally1.no, 0);
         assertEq(tally1.abstain, 0);
 
         plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
-        (,,, MajorityVotingBase.Tally memory tally2,,,) = plugin.getProposal(proposalId);
+        (,,, IMajorityVoting.Tally memory tally2,,,) = plugin.getProposal(proposalId);
         assertEq(tally2.yes, 0);
         assertEq(tally2.no, bal);
         assertEq(tally2.abstain, 0);
 
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Abstain, false);
-        (,,, MajorityVotingBase.Tally memory tally3,,,) = plugin.getProposal(proposalId);
+        (,,, IMajorityVoting.Tally memory tally3,,,) = plugin.getProposal(proposalId);
         assertEq(tally3.yes, 0);
         assertEq(tally3.no, 0);
         assertEq(tally3.abstain, bal);
@@ -1391,7 +1391,7 @@ contract TokenVotingTest is TestBase {
 
         assertFalse(plugin.canExecute(proposalId));
 
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
 
         assertTrue(plugin.canExecute(proposalId));
@@ -1412,7 +1412,7 @@ contract TokenVotingTest is TestBase {
     function test_WhenTryingToExecuteAProposalThatIsNotYetDecided3() external givenInTheVoteReplacementVotingMode {
         // It reverts if vote is not decided yet
         uint256 proposalId = _createDummyProposal(vm.addr(100));
-        vm.expectRevert(abi.encodeWithSelector(MajorityVotingBase.ProposalExecutionForbidden.selector, proposalId));
+        vm.expectRevert(abi.encodeWithSelector(IMajorityVoting.ProposalExecutionForbidden.selector, proposalId));
         plugin.execute(proposalId);
     }
 
@@ -1447,7 +1447,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(102));
         plugin.vote(proposalId, IMajorityVoting.VoteOption.Yes, false);
 
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
         assertFalse(plugin.canExecute(proposalId));
     }
@@ -1467,7 +1467,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(103));
         plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
 
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
         assertFalse(plugin.canExecute(proposalId));
     }
@@ -1487,7 +1487,7 @@ contract TokenVotingTest is TestBase {
         vm.prank(vm.addr(103));
         plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
 
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
         assertFalse(plugin.canExecute(proposalId));
     }
@@ -1508,7 +1508,7 @@ contract TokenVotingTest is TestBase {
             vm.prank(vm.addr(100 + i));
             plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
         }
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
         assertFalse(plugin.canExecute(proposalId));
     }
@@ -1528,7 +1528,7 @@ contract TokenVotingTest is TestBase {
         plugin.vote(proposalId, IMajorityVoting.VoteOption.No, false);
         assertFalse(plugin.canExecute(proposalId));
 
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
         assertTrue(plugin.canExecute(proposalId));
     }
@@ -1566,7 +1566,7 @@ contract TokenVotingTest is TestBase {
         // It does not execute with 0 votes
         uint256 proposalId = _createDummyProposal(alice);
         assertFalse(plugin.canExecute(proposalId));
-        (,, MajorityVotingBase.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
+        (,, IMajorityVoting.ProposalParameters memory params,,,,) = plugin.getProposal(proposalId);
         vm.warp(params.endDate);
         assertFalse(plugin.canExecute(proposalId));
     }

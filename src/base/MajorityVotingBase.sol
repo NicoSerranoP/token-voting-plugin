@@ -126,78 +126,6 @@ abstract contract MajorityVotingBase is
 {
     using SafeCastUpgradeable for uint256;
 
-    /// @notice A container for the majority voting settings that will be applied as parameters on proposal creation.
-    /// @param votingMode A parameter to select the vote mode.
-    ///     In standard mode (0), early execution and vote replacement are disabled.
-    ///     In early execution mode (1), a proposal can be executed early before the end date
-    ///     if the vote outcome cannot mathematically change by more voters voting.
-    ///     In vote replacement mode (2), voters can change their vote multiple times
-    ///     and only the latest vote option is tallied.
-    /// @param supportThreshold The support threshold value.
-    ///     Its value has to be in the interval [0, 10^6) defined by `RATIO_BASE = 10**6`.
-    /// @param minParticipation The minimum participation value.
-    ///     Its value has to be in the interval [0, 10^6] defined by `RATIO_BASE = 10**6`.
-    /// @param minDuration The minimum duration of the proposal vote in seconds.
-    /// @param minProposerVotingPower The minimum voting power required to create a proposal.
-    struct VotingSettings {
-        VotingMode votingMode;
-        uint32 supportThreshold;
-        uint32 minParticipation;
-        uint64 minDuration;
-        uint256 minProposerVotingPower;
-    }
-
-    /// @notice A container for proposal-related information.
-    /// @param executed Whether the proposal is executed or not.
-    /// @param parameters The proposal parameters at the time of the proposal creation.
-    /// @param tally The vote tally of the proposal.
-    /// @param voters The votes casted by the voters.
-    /// @param actions The actions to be executed when the proposal passes.
-    /// @param allowFailureMap A bitmap allowing the proposal to succeed, even if individual actions might revert.
-    ///     If the bit at index `i` is 1, the proposal succeeds even if the `i`th action reverts.
-    ///     A failure map value of 0 requires every action to not revert.
-    /// @param minApprovalPower The minimum amount of yes votes power needed for the proposal advance.
-    /// @param targetConfig Configuration for the execution target, specifying the target address and operation type
-    ///     (either `Call` or `DelegateCall`). Defined by `TargetConfig` in the `IPlugin` interface,
-    ///     part of the `osx-commons-contracts` package, added in build 3.
-    struct Proposal {
-        bool executed;
-        ProposalParameters parameters;
-        Tally tally;
-        mapping(address => IMajorityVoting.VoteOption) voters;
-        Action[] actions;
-        uint256 allowFailureMap;
-        uint256 minApprovalPower;
-        TargetConfig targetConfig; // added in v1.3
-    }
-
-    /// @notice A container for the proposal parameters at the time of proposal creation.
-    /// @param votingMode A parameter to select the vote mode.
-    /// @param supportThreshold The support threshold value.
-    ///     The value has to be in the interval [0, 10^6) defined by `RATIO_BASE = 10**6`.
-    /// @param startDate The start date of the proposal vote.
-    /// @param endDate The end date of the proposal vote.
-    /// @param snapshotTimepoint The number of the block prior to the proposal creation.
-    /// @param minVotingPower The minimum voting power needed for a proposal to reach minimum participation.
-    struct ProposalParameters {
-        VotingMode votingMode;
-        uint32 supportThreshold;
-        uint64 startDate;
-        uint64 endDate;
-        uint64 snapshotTimepoint;
-        uint256 minVotingPower;
-    }
-
-    /// @notice A container for the proposal vote tally.
-    /// @param abstain The number of abstain votes casted.
-    /// @param yes The number of yes votes casted.
-    /// @param no The number of no votes casted.
-    struct Tally {
-        uint256 abstain;
-        uint256 yes;
-        uint256 no;
-    }
-
     /// @notice The [ERC-165](https://eips.ethereum.org/EIPS/eip-165) interface ID of the contract.
     bytes4 internal constant MAJORITY_VOTING_BASE_INTERFACE_ID = this.minDuration.selector
         ^ this.minProposerVotingPower.selector ^ this.votingMode.selector ^ this.totalVotingPower.selector
@@ -223,56 +151,6 @@ abstract contract MajorityVotingBase is
     /// @notice The minimum ratio of yes votes needed for a proposal to succeed.
     /// @dev Not included in VotingSettings for compatibility reasons.
     uint256 private minApprovals; // added in v1.3
-
-    /// @notice Thrown if a date is out of bounds.
-    /// @param limit The limit value.
-    /// @param actual The actual value.
-    error DateOutOfBounds(uint64 limit, uint64 actual);
-
-    /// @notice Thrown if the minimal duration value is out of bounds (less than one hour or greater than 1 year).
-    /// @param limit The limit value.
-    /// @param actual The actual value.
-    error MinDurationOutOfBounds(uint64 limit, uint64 actual);
-
-    /// @notice Thrown when a proposal doesn't exist.
-    /// @param proposalId The ID of the proposal which doesn't exist.
-    error NonexistentProposal(uint256 proposalId);
-
-    /// @notice Thrown if an account is not allowed to cast a vote. This can be because the vote
-    /// - has not started,
-    /// - has ended,
-    /// - was executed, or
-    /// - the account doesn't have voting powers.
-    /// @param proposalId The ID of the proposal.
-    /// @param account The address of the _account.
-    /// @param voteOption The chosen vote option.
-    error VoteCastForbidden(uint256 proposalId, address account, VoteOption voteOption);
-
-    /// @notice Thrown if the proposal execution is forbidden.
-    /// @param proposalId The ID of the proposal.
-    error ProposalExecutionForbidden(uint256 proposalId);
-
-    /// @notice Thrown if the proposal with same actions and metadata already exists.
-    /// @param proposalId The id of the proposal.
-    error ProposalAlreadyExists(uint256 proposalId);
-
-    /// @notice Emitted when the voting settings are updated.
-    /// @param votingMode A parameter to select the vote mode.
-    /// @param supportThreshold The support threshold value.
-    /// @param minParticipation The minimum participation value.
-    /// @param minDuration The minimum duration of the proposal vote in seconds.
-    /// @param minProposerVotingPower The minimum voting power required to create a proposal.
-    event VotingSettingsUpdated(
-        VotingMode votingMode,
-        uint32 supportThreshold,
-        uint32 minParticipation,
-        uint64 minDuration,
-        uint256 minProposerVotingPower
-    );
-
-    /// @notice Emitted when the min approval value is updated.
-    /// @param minApprovals The minimum amount of yes votes needed for a proposal succeed.
-    event VotingMinApprovalUpdated(uint256 minApprovals);
 
     modifier onlyIfProposalExists(uint256 _proposalId) {
         if (!_proposalExists(_proposalId)) {

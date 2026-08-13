@@ -7,14 +7,13 @@ import {IPlugin} from "@aragon/osx-commons-contracts/src/plugin/IPlugin.sol";
 import {Action} from "@aragon/osx-commons-contracts/src/executors/IExecutor.sol";
 import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
 
-import {ForkTestBase} from "lib/ForkTestBase.sol";
+import {ForkTestBase} from "./lib/ForkTestBase.sol";
 
-import {InstallTokenVotingScript, InstallParams} from "../../script/InstallTokenVoting.s.sol";
-import {TokenVoting} from "../../src/TokenVoting.sol";
-import {MajorityVotingBase} from "../../src/base/MajorityVotingBase.sol";
-import {IMajorityVoting} from "../../src/base/IMajorityVoting.sol";
-import {GovernanceERC20} from "../../src/erc20/GovernanceERC20.sol";
-import {VotingPowerCondition} from "../../src/condition/VotingPowerCondition.sol";
+import {InstallTokenVotingScript, InstallParams} from "../script/InstallTokenVoting.s.sol";
+import {TokenVoting} from "../src/TokenVoting.sol";
+import {IMajorityVoting} from "../src/base/IMajorityVoting.sol";
+import {GovernanceERC20} from "../src/erc20/GovernanceERC20.sol";
+import {VotingPowerCondition} from "../src/condition/VotingPowerCondition.sol";
 
 /// @dev Exercises InstallTokenVotingScript against a real OSx deployment (DAOFactory) on a fork,
 ///     covering both the new-DAO and existing-DAO install paths plus a full proposal lifecycle.
@@ -139,7 +138,7 @@ contract InstallTokenVotingForkTest is ForkTestBase {
     }
 
     function _defaultParams() internal pure returns (InstallParams memory params) {
-        params.votingSettings = MajorityVotingBase.VotingSettings({
+        params.votingSettings = IMajorityVoting.VotingSettings({
             votingMode: IMajorityVoting.VotingMode.Standard,
             supportThreshold: 500_000,
             minParticipation: 100_000,
