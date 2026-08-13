@@ -59,7 +59,7 @@ contract TokenVotingTest is TestBase {
         plugin.initialize(
             dao,
             MajorityVotingBase.VotingSettings({
-                votingMode: MajorityVotingBase.VotingMode.Standard,
+                votingMode: IMajorityVoting.VotingMode.Standard,
                 supportThreshold: 500_000,
                 minParticipation: 100_000,
                 minDuration: ONE_HOUR,
@@ -84,7 +84,7 @@ contract TokenVotingTest is TestBase {
 
         // WHEN calling initialize
         MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
-            votingMode: MajorityVotingBase.VotingMode.EarlyExecution,
+            votingMode: IMajorityVoting.VotingMode.EarlyExecution,
             supportThreshold: 400_000, // 40%
             minParticipation: 200_000, // 20%
             minDuration: ONE_DAY,
@@ -227,7 +227,7 @@ contract TokenVotingTest is TestBase {
             address proxy = ProxyLib.deployUUPSProxy(base, "");
             MyTokenVoting myPlugin = MyTokenVoting(proxy);
             MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
-                votingMode: MajorityVotingBase.VotingMode.EarlyExecution,
+                votingMode: IMajorityVoting.VotingMode.EarlyExecution,
                 supportThreshold: 400_000, // 40%
                 minParticipation: 200_000, // 20%
                 minDuration: ONE_DAY,
@@ -283,7 +283,7 @@ contract TokenVotingTest is TestBase {
         address proxy = ProxyLib.deployUUPSProxy(base, "");
         MyTokenVoting myPlugin = MyTokenVoting(proxy);
         MajorityVotingBase.VotingSettings memory settings = MajorityVotingBase.VotingSettings({
-            votingMode: MajorityVotingBase.VotingMode.EarlyExecution,
+            votingMode: IMajorityVoting.VotingMode.EarlyExecution,
             supportThreshold: 400_000, // 40%
             minParticipation: 200_000, // 20%
             minDuration: ONE_DAY,

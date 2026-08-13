@@ -7,6 +7,18 @@ pragma solidity ^0.8.8;
 /// @notice The interface of majority voting plugin.
 /// @custom:security-contact sirt@aragon.org
 interface IMajorityVoting {
+    /// @notice The different voting modes available.
+    /// @param Standard In standard mode, early execution and vote replacement are disabled.
+    /// @param EarlyExecution In early execution mode, a proposal can be executed
+    ///     early before the end date if the vote outcome cannot mathematically change by more voters voting.
+    /// @param VoteReplacement In vote replacement mode, voters can change their vote
+    ///     multiple times and only the latest vote option is tallied.
+    enum VotingMode {
+        Standard,
+        EarlyExecution,
+        VoteReplacement
+    }
+
     /// @notice Vote options that a voter can chose from.
     /// @param None The default option state of a voter indicating the absence from the vote.
     ///     This option neither influences support nor participation.

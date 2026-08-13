@@ -4,9 +4,9 @@ pragma solidity ^0.8.17;
 import {TestBase} from "../lib/TestBase.sol";
 
 import {DAO} from "@aragon/osx/core/dao/DAO.sol";
-import {TokenVotingSetup} from "../../src/TokenVotingSetup.sol";
 import {TokenVoting} from "../../src/TokenVoting.sol";
 import {GovernanceERC20} from "../../src/erc20/GovernanceERC20.sol";
+import {IMajorityVoting} from "../../src/base/IMajorityVoting.sol";
 import {MajorityVotingBase} from "../../src/base/MajorityVotingBase.sol";
 import {VotingPowerCondition} from "../../src/condition/VotingPowerCondition.sol";
 import {ProxyLib} from "@aragon/osx-commons-contracts/src/utils/deployment/ProxyLib.sol";
@@ -21,7 +21,7 @@ contract SimpleBuilder is TestBase {
     // Parameters to override
     address daoOwner; // Used for testing purposes only
 
-    MajorityVotingBase.VotingMode votingMode = MajorityVotingBase.VotingMode.Standard;
+    MajorityVotingBase.VotingMode votingMode = IMajorityVoting.VotingMode.Standard;
     uint32 supportThreshold = 500_000; // 50%
     uint32 minParticipation = 100_000; // 10%
     uint64 minDuration = 60 * 60; // 1h
@@ -50,12 +50,12 @@ contract SimpleBuilder is TestBase {
     }
 
     function withEarlyExecution() public returns (SimpleBuilder) {
-        votingMode = MajorityVotingBase.VotingMode.EarlyExecution;
+        votingMode = IMajorityVoting.VotingMode.EarlyExecution;
         return this;
     }
 
     function withVoteReplacement() public returns (SimpleBuilder) {
-        votingMode = MajorityVotingBase.VotingMode.VoteReplacement;
+        votingMode = IMajorityVoting.VotingMode.VoteReplacement;
         return this;
     }
 

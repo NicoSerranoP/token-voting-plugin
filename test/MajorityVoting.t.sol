@@ -36,7 +36,7 @@ contract MajorityVotingBaseTest is TestBase {
         (dao, plugin, token, condition) = builder.build();
 
         defaultNewVotingSettings = MajorityVotingBase.VotingSettings({
-            votingMode: MajorityVotingBase.VotingMode.EarlyExecution,
+            votingMode: IMajorityVoting.VotingMode.EarlyExecution,
             supportThreshold: 500_000,
             minParticipation: 200_000,
             minDuration: 1 hours,
@@ -54,7 +54,7 @@ contract MajorityVotingBaseTest is TestBase {
         plugin.initialize(
             dao,
             MajorityVotingBase.VotingSettings({
-                votingMode: MajorityVotingBase.VotingMode.Standard,
+                votingMode: IMajorityVoting.VotingMode.Standard,
                 supportThreshold: 500_000,
                 minParticipation: 100_000,
                 minDuration: 1 hours,
@@ -270,7 +270,7 @@ contract MajorityVotingBaseTest is TestBase {
         plugin.updateVotingSettings(defaultNewVotingSettings);
 
         (
-            MajorityVotingBase.VotingMode mode,
+            IMajorityVoting.VotingMode mode,
             uint32 support,
             uint32 participation,
             uint64 duration,

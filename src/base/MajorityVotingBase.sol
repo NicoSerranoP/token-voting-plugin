@@ -126,18 +126,6 @@ abstract contract MajorityVotingBase is
 {
     using SafeCastUpgradeable for uint256;
 
-    /// @notice The different voting modes available.
-    /// @param Standard In standard mode, early execution and vote replacement are disabled.
-    /// @param EarlyExecution In early execution mode, a proposal can be executed
-    ///     early before the end date if the vote outcome cannot mathematically change by more voters voting.
-    /// @param VoteReplacement In vote replacement mode, voters can change their vote
-    ///     multiple times and only the latest vote option is tallied.
-    enum VotingMode {
-        Standard,
-        EarlyExecution,
-        VoteReplacement
-    }
-
     /// @notice A container for the majority voting settings that will be applied as parameters on proposal creation.
     /// @param votingMode A parameter to select the vote mode.
     ///     In standard mode (0), early execution and vote replacement are disabled.
