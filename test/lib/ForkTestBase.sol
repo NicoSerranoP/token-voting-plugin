@@ -32,11 +32,10 @@ contract ForkTestBase is TestBase {
                 subdomain: "",
                 metadata: ""
             });
-
         // No plugins, the sender (aka anyone) can execute
         DAOFactory.PluginSettings[] memory installSettings = new DAOFactory.PluginSettings[](0);
-
         DAOFactory.InstalledPlugin[] memory installedPlugins;
+
         (dao, installedPlugins) = daoFactory.createDao(daoSettings, installSettings);
 
         // Set msg.sender as the owner
@@ -52,7 +51,6 @@ contract ForkTestBase is TestBase {
         dao.execute(bytes32(0), actions, 0);
 
         vm.label(address(dao), "DAO");
-
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
     }
