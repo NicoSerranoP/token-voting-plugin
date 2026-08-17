@@ -76,7 +76,7 @@ contract InstallTokenVotingForkTest is ForkTestBase {
         // Simulates a DAO that already exists and whose operator (this test contract) already
         // holds EXECUTE_PERMISSION_ID on it — the documented precondition for this install path.
         DAO dao = build();
-        dao.grant(address(dao), address(this), dao.EXECUTE_PERMISSION_ID());
+        dao.grant(address(dao), address(script), dao.EXECUTE_PERMISSION_ID());
 
         (TokenVoting plugin, IVotesUpgradeable token, VotingPowerCondition condition) =
             script.installOnExistingDao(dao, _defaultParams());

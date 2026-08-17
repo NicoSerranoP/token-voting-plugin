@@ -25,6 +25,7 @@ import {
 import {ERC20ClockMock, ERC20NoClockMock} from "./mocks/ERC20ClockMock.sol";
 import {ProxyLib} from "@aragon/osx-commons-contracts/src/utils/deployment/ProxyLib.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {RatioOutOfBounds} from "@aragon/osx-commons-contracts/src/utils/math/Ratio.sol";
 
 contract TokenVotingTest is TestBase {
     // Convenience aliases
@@ -345,34 +346,12 @@ contract TokenVotingTest is TestBase {
         assertTrue(plugin.supportsInterface(type(IMajorityVoting).interfaceId));
     }
 
-    function test_WhenCallingSupportsInterfaceForTheOldIMajorityVoting() external givenInTheERC165Context {
-        // It supports the `IMajorityVoting` OLD interface
-        bytes4 oldInterfaceId =
-            type(IMajorityVoting).interfaceId ^ plugin.isMinApprovalReached.selector ^ plugin.minApproval.selector;
-        assertTrue(plugin.supportsInterface(oldInterfaceId));
-    }
-
     function test_WhenCallingSupportsInterfaceForMajorityVotingBase() external givenInTheERC165Context {
         // It supports the `MajorityVotingBase` interface
-        bytes4 interfaceId = plugin.minDuration.selector ^ plugin.minProposerVotingPower.selector
-            ^ plugin.votingMode.selector ^ plugin.totalVotingPower.selector ^ plugin.getProposal.selector
-            ^ plugin.updateVotingSettings.selector ^ plugin.updateMinApprovals.selector
+        bytes4 interfaceId = plugin.minDuration.selector ^ plugin.getVotingToken.selector
+            ^ plugin.minProposerVotingPower.selector ^ plugin.votingMode.selector ^ plugin.totalVotingPower.selector
+            ^ plugin.getProposal.selector ^ plugin.updateVotingSettings.selector ^ plugin.updateMinApprovals.selector
             ^ bytes4(keccak256("createProposal(bytes,(address,uint256,bytes)[],uint256,uint64,uint64,uint8,bool)"));
-        assertTrue(plugin.supportsInterface(interfaceId));
-    }
-
-    function test_WhenCallingSupportsInterfaceForTheOldMajorityVotingBase() external givenInTheERC165Context {
-        // It supports the `MajorityVotingBase` OLD interface
-        bytes4 interfaceId = plugin.minDuration.selector ^ plugin.minProposerVotingPower.selector
-            ^ plugin.votingMode.selector ^ plugin.totalVotingPower.selector ^ plugin.getProposal.selector
-            ^ plugin.updateVotingSettings.selector
-            ^ bytes4(keccak256("createProposal(bytes,(address,uint256,bytes)[],uint256,uint64,uint64,uint8,bool)"));
-        assertTrue(plugin.supportsInterface(interfaceId));
-    }
-
-    function test_WhenCallingSupportsInterfaceForTokenVoting() external givenInTheERC165Context {
-        // It supports the `TokenVoting` interface
-        bytes4 interfaceId = plugin.getVotingToken.selector;
         assertTrue(plugin.supportsInterface(interfaceId));
     }
 
@@ -1783,6 +1762,186 @@ contract TokenVotingTest is TestBase {
 
     function test_WhenTestingWithAMagnitudeOf1066() external givenExecutionCriteriaMultipleOrdersOfMagnitude {
         _runMagnitudeTest(66);
+    }
+
+    function _defaultVotingSettings() internal pure returns (IMajorityVoting.VotingSettings memory) {
+        return IMajorityVoting.VotingSettings({
+            votingMode: IMajorityVoting.VotingMode.EarlyExecution,
+            supportThreshold: 500_000,
+            minParticipation: 200_000,
+            minDuration: ONE_HOUR,
+            minProposerVotingPower: 0
+        });
+    }
+
+    modifier givenThePluginIsInitializedWithUpdateVotingSettingsPermission() {
+        (dao, plugin, token,) = new DAOBuilder().build();
+        dao.grant(address(plugin), address(this), plugin.UPDATE_VOTING_SETTINGS_PERMISSION_ID());
+        _;
+    }
+
+    function test_WhenCallingUpdateVotingSettingsAsUnauthorizedCaller()
+        external
+        givenThePluginIsInitializedWithUpdateVotingSettingsPermission
+    {
+        // It reverts if caller is unauthorized
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector,
+                address(dao),
+                address(plugin),
+                bob,
+                plugin.UPDATE_VOTING_SETTINGS_PERMISSION_ID()
+            )
+        );
+        vm.prank(bob);
+        plugin.updateVotingSettings(_defaultVotingSettings());
+    }
+
+    function test_WhenCallingUpdateVotingSettingsWhereSupportThresholdEquals100()
+        external
+        givenThePluginIsInitializedWithUpdateVotingSettingsPermission
+    {
+        // It reverts if the support threshold specified equals 100%
+        IMajorityVoting.VotingSettings memory newSettings = _defaultVotingSettings();
+        newSettings.supportThreshold = uint32(RATIO_BASE);
+
+        vm.expectRevert(abi.encodeWithSelector(RatioOutOfBounds.selector, RATIO_BASE - 1, newSettings.supportThreshold));
+        plugin.updateVotingSettings(newSettings);
+    }
+
+    function test_WhenCallingUpdateVotingSettingsWhereSupportThresholdExceeds100()
+        external
+        givenThePluginIsInitializedWithUpdateVotingSettingsPermission
+    {
+        // It reverts if the support threshold specified exceeds 100%
+        IMajorityVoting.VotingSettings memory newSettings = _defaultVotingSettings();
+        newSettings.supportThreshold = uint32(RATIO_BASE) + 100;
+
+        vm.expectRevert(abi.encodeWithSelector(RatioOutOfBounds.selector, RATIO_BASE - 1, newSettings.supportThreshold));
+        plugin.updateVotingSettings(newSettings);
+    }
+
+    function test_WhenCallingUpdateVotingSettingsWhereMinimumParticipationExceeds100()
+        external
+        givenThePluginIsInitializedWithUpdateVotingSettingsPermission
+    {
+        // It reverts if the minimum participation specified exceeds 100%
+        IMajorityVoting.VotingSettings memory newSettings = _defaultVotingSettings();
+        newSettings.minParticipation = uint32(RATIO_BASE) + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(RatioOutOfBounds.selector, RATIO_BASE, newSettings.minParticipation));
+        plugin.updateVotingSettings(newSettings);
+    }
+
+    function test_WhenCallingUpdateVotingSettingsWhereMinimalDurationIsShorterThanOneHour()
+        external
+        givenThePluginIsInitializedWithUpdateVotingSettingsPermission
+    {
+        // It reverts if the minimal duration is shorter than one hour
+        IMajorityVoting.VotingSettings memory newSettings = _defaultVotingSettings();
+        newSettings.minDuration = ONE_HOUR - 1;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IMajorityVoting.MinDurationOutOfBounds.selector, ONE_HOUR, newSettings.minDuration)
+        );
+        plugin.updateVotingSettings(newSettings);
+    }
+
+    function test_WhenCallingUpdateVotingSettingsWhereMinimalDurationIsLongerThanOneYear()
+        external
+        givenThePluginIsInitializedWithUpdateVotingSettingsPermission
+    {
+        // It reverts if the minimal duration is longer than one year
+        IMajorityVoting.VotingSettings memory newSettings = _defaultVotingSettings();
+        newSettings.minDuration = 365 days + 1;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IMajorityVoting.MinDurationOutOfBounds.selector, 365 days, newSettings.minDuration)
+        );
+        plugin.updateVotingSettings(newSettings);
+    }
+
+    function test_WhenCallingUpdateVotingSettingsSuccessfully()
+        external
+        givenThePluginIsInitializedWithUpdateVotingSettingsPermission
+    {
+        // It should change the voting settings successfully
+        IMajorityVoting.VotingSettings memory newSettings = _defaultVotingSettings();
+
+        vm.expectEmit(true, true, true, true);
+        emit IMajorityVoting.VotingSettingsUpdated(
+            newSettings.votingMode,
+            newSettings.supportThreshold,
+            newSettings.minParticipation,
+            newSettings.minDuration,
+            newSettings.minProposerVotingPower
+        );
+
+        plugin.updateVotingSettings(newSettings);
+
+        assertEq(uint8(plugin.votingMode()), uint8(newSettings.votingMode));
+        assertEq(plugin.supportThreshold(), newSettings.supportThreshold);
+        assertEq(plugin.minParticipation(), newSettings.minParticipation);
+        assertEq(plugin.minDuration(), newSettings.minDuration);
+        assertEq(plugin.minProposerVotingPower(), newSettings.minProposerVotingPower);
+    }
+
+    function test_WhenCallingUpdateMinApprovalsAsUnauthorizedCaller()
+        external
+        givenThePluginIsInitializedWithUpdateVotingSettingsPermission
+    {
+        // It reverts if caller is unauthorized
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector,
+                address(dao),
+                address(plugin),
+                bob,
+                plugin.UPDATE_VOTING_SETTINGS_PERMISSION_ID()
+            )
+        );
+        vm.prank(bob);
+        plugin.updateMinApprovals(100_000);
+    }
+
+    function test_WhenCallingUpdateMinApprovalsWhereTheMinimumApprovalExceeds100()
+        external
+        givenThePluginIsInitializedWithUpdateVotingSettingsPermission
+    {
+        // It reverts if the minimum approval specified exceeds 100%
+        uint256 newMinApproval = RATIO_BASE + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(RatioOutOfBounds.selector, RATIO_BASE, newMinApproval));
+        plugin.updateMinApprovals(newMinApproval);
+    }
+
+    function test_WhenCallingUpdateMinApprovalsSuccessfully()
+        external
+        givenThePluginIsInitializedWithUpdateVotingSettingsPermission
+    {
+        // It should change the minimum approval successfully
+        uint256 newMinApproval = 100_000; // 10%
+
+        vm.expectEmit(true, false, false, true);
+        emit IMajorityVoting.VotingMinApprovalUpdated(newMinApproval);
+
+        plugin.updateMinApprovals(newMinApproval);
+
+        assertEq(plugin.minApproval(), newMinApproval);
+    }
+
+    function test_WhenCallingSetTargetConfig() external {
+        // It should change the target config successfully
+        (dao, plugin,,) = new DAOBuilder().build();
+        dao.grant(address(plugin), address(this), SET_TARGET_CONFIG_PERMISSION_ID);
+
+        IPlugin.TargetConfig memory newConfig = IPlugin.TargetConfig(david, IPlugin.Operation.DelegateCall);
+
+        plugin.setTargetConfig(newConfig);
+
+        assertEq(plugin.getTargetConfig().target, newConfig.target);
+        assertEq(uint8(plugin.getTargetConfig().operation), uint8(newConfig.operation));
     }
 }
 

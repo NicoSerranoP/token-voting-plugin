@@ -38,14 +38,14 @@ contract ForkTestBase is TestBase {
 
         (dao, installedPlugins) = daoFactory.createDao(daoSettings, installSettings);
 
-        // Set msg.sender as the owner
+        // Set this test contract as the owner
         Action[] memory actions = new Action[](1);
         actions[0] = Action({
             to: address(dao),
             value: 0,
             data: abi.encodeCall(
                 PermissionManager.grant,
-                (address(dao), msg.sender, dao.ROOT_PERMISSION_ID())
+                (address(dao), address(this), dao.ROOT_PERMISSION_ID())
             )
         });
         dao.execute(bytes32(0), actions, 0);
