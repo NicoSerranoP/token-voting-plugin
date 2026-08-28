@@ -33,7 +33,6 @@ contract DAOBuilder is TestBase {
     IPlugin.Operation targetOperation;
     uint256 minApprovals;
     bytes pluginMetadata;
-    address[] excludedAccounts;
     bool selfDelegateOnMint = true;
 
     constructor() {
@@ -118,11 +117,6 @@ contract DAOBuilder is TestBase {
         return this;
     }
 
-    function withExcludedAccount(address account) public returns (DAOBuilder) {
-        excludedAccounts.push(account);
-        return this;
-    }
-
     function withSelfDelegationOnMint() public returns (DAOBuilder) {
         selfDelegateOnMint = true;
         return this;
@@ -187,7 +181,7 @@ contract DAOBuilder is TestBase {
                 address(TOKEN_VOTING_PLUGIN_BASE),
                 abi.encodeCall(
                     TokenVoting.initialize,
-                    (dao, votingSettings, token_, targetConfig, minApprovals, pluginMetadata, excludedAccounts)
+                    (dao, votingSettings, token_, targetConfig, minApprovals, pluginMetadata)
                 )
             )
         );

@@ -13,7 +13,6 @@ import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/
 import {SafeCastUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {IERC6372Upgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC6372Upgradeable.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {ProposalUpgradeable} from "@aragon/osx-commons-contracts/src/plugin/extensions/proposal/ProposalUpgradeable.sol";
 import {RATIO_BASE, RatioOutOfBounds} from "@aragon/osx-commons-contracts/src/utils/math/Ratio.sol";
@@ -132,7 +131,6 @@ contract TokenVoting is
     ProposalUpgradeable
 {
     using SafeCastUpgradeable for uint256;
-    using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice The [ERC-165](https://eips.ethereum.org/EIPS/eip-165) interface ID of the contract.
     /// @dev use keccak string due to 2 createProposal functions declared in the contract
@@ -168,13 +166,6 @@ contract TokenVoting is
     /// @notice Wether the token contract indexes past voting power by timestamp.
     bool public tokenIndexedByTimestamp; // Slot 0
 
-    /// @notice The list of addresses excluded from voting
-    EnumerableSet.AddressSet internal excludedAccounts; // Slot 1
-
-    /// @notice Emitted when an account's balance is considered as non-circulating supply. Its balance will be excluded from the token supply computation.
-    /// @param accounts The addresses whose balance is considered as not circulating
-    event ExcludedFromSupply(address[] accounts);
-
     /// @notice Thrown if the voting power is zero
     error NoVotingPower();
 
@@ -208,8 +199,7 @@ contract TokenVoting is
         IVotesUpgradeable _token,
         TargetConfig calldata _targetConfig,
         uint256 _minApprovals,
-        bytes calldata _pluginMetadata,
-        address[] memory _excludedAccounts
+        bytes calldata _pluginMetadata
     ) external initializer {
         __PluginCloneable_init(_dao);
         _updateVotingSettings(_votingSettings);
@@ -220,17 +210,6 @@ contract TokenVoting is
         votingToken = _token;
 
         _detectTokenClock();
-
-        for (uint256 i; i < _excludedAccounts.length;) {
-            excludedAccounts.add(_excludedAccounts[i]);
-
-            unchecked {
-                ++i;
-            }
-        }
-        if (_excludedAccounts.length > 0) {
-            emit ExcludedFromSupply(_excludedAccounts);
-        }
 
         emit MembershipContractAnnounced({definingContract: address(_token)});
     }
@@ -263,15 +242,8 @@ contract TokenVoting is
     /// @param _timePoint The block number or timestamp.
     /// @return The effective voting power.
     function totalVotingPower(uint256 _timePoint) public view returns (uint256) {
-        uint256 _excludedSupply;
-        for (uint256 i; i < excludedAccounts.length();) {
-            _excludedSupply += votingToken.getPastVotes(excludedAccounts.at(i), _timePoint);
-
-            unchecked {
-                ++i;
-            }
-        }
-        return votingToken.getPastTotalSupply(_timePoint) - _excludedSupply;
+        // TODO: return the number of authorized NFTs to vote at a specific time period
+        return votingToken.getPastTotalSupply(_timePoint);
     }
 
     /// @inheritdoc IMajorityVoting

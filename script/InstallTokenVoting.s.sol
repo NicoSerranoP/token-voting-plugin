@@ -30,7 +30,6 @@ struct InstallParams {
     IPlugin.TargetConfig targetConfig; // target == address(0) resolves to the DAO itself
     uint256 minApprovals;
     bytes pluginMetadata;
-    address[] excludedAccounts;
 }
 
 /**
@@ -179,8 +178,7 @@ contract InstallTokenVotingScript is Script {
                         _token,
                         targetConfig,
                         _params.minApprovals,
-                        _params.pluginMetadata,
-                        _params.excludedAccounts
+                        _params.pluginMetadata
                     )
                 )
             )
@@ -263,7 +261,6 @@ contract InstallTokenVotingScript is Script {
         });
         params.minApprovals = vm.envOr("MIN_APPROVALS", uint256(0));
         params.pluginMetadata = bytes(vm.envOr("PLUGIN_METADATA_URI", string("")));
-        params.excludedAccounts = new address[](0);
     }
 
     function _readVotingSettings(InstallParams memory params) internal view {
