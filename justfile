@@ -2,7 +2,7 @@ default: help
 import 'lib/just-foundry/justfile'
 
 # The deploy script run by `just deploy` / `just predeploy`.
-DEPLOY_SCRIPT := "script/InstallTokenVoting.s.sol:InstallTokenVotingScript"
+DEPLOY_SCRIPT := "script/InstallNFTVoting.s.sol:InstallNFTVotingScript"
 
 # Fetch submodules, scaffold .env and select the network (default: mainnet)
 [group('setup')]

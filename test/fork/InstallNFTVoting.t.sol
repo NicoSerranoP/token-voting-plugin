@@ -9,62 +9,60 @@ import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/
 
 import {ForkTestBase} from "../lib/ForkTestBase.sol";
 
-import {InstallTokenVotingScript, InstallParams} from "../../script/InstallTokenVoting.s.sol";
-import {TokenVoting} from "../../src/TokenVoting.sol";
-import {IMajorityVoting} from "../../src/base/IMajorityVoting.sol";
-import {GovernanceERC20} from "../../src/erc20/GovernanceERC20.sol";
+import {InstallNFTVotingScript, InstallParams} from "../../script/InstallNFTVoting.s.sol";
+import {NFTVoting} from "../../src/NFTVoting.sol";
+import {INFTVoting} from "../../src/base/INFTVoting.sol";
+import {GovernanceERC721} from "../../src/erc721/GovernanceERC721.sol";
 import {VotingPowerCondition} from "../../src/condition/VotingPowerCondition.sol";
 
-/// @dev Exercises InstallTokenVotingScript against a real OSx deployment (DAOFactory) on a fork,
+/// @dev Exercises InstallNFTVotingScript against a real OSx deployment (DAOFactory) on a fork,
 ///     covering both the new-DAO and existing-DAO install paths plus a full proposal lifecycle.
-contract InstallTokenVotingTest is ForkTestBase {
-    InstallTokenVotingScript internal script;
+contract InstallNFTVotingTest is ForkTestBase {
+    InstallNFTVotingScript internal script;
 
     function setUp() public {
-        script = new InstallTokenVotingScript();
+        script = new InstallNFTVotingScript();
     }
 
     function test_WhenCreatingANewDaoWithANewToken() external {
-        (DAO dao, TokenVoting plugin, IVotesUpgradeable token, VotingPowerCondition condition) =
+        (DAO dao, NFTVoting plugin, IVotesUpgradeable token, VotingPowerCondition condition) =
             script.createDaoAndInstall(daoFactory, _daoSettings(), _defaultParams());
 
         assertTrue(
-            dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""),
-            "Plugin should be installed"
+            dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be installed"
         );
         assertTrue(
             dao.isGranted(address(plugin), address(0x1234), plugin.CREATE_PROPOSAL_PERMISSION_ID(), ""),
             "Anyone should be able to create proposals (minProposerVotingPower == 0)"
         );
         assertNotEq(address(token), address(0), "A new token should have been minted");
-        assertTrue(plugin.isMember(address(this)), "Deployer should hold the newly minted token");
+        assertTrue(plugin.isMember(address(this)), "Deployer should hold the newly minted NFT");
         assertNotEq(address(condition), address(0));
+
+        // The DAO should be able to mint, burn and force-transfer vote NFTs.
+        GovernanceERC721 nft = GovernanceERC721(address(token));
+        assertTrue(dao.isGranted(address(nft), address(dao), nft.MINT_PERMISSION_ID(), ""));
+        assertTrue(dao.isGranted(address(nft), address(dao), nft.BURN_PERMISSION_ID(), ""));
+        assertTrue(dao.isGranted(address(nft), address(dao), nft.TRANSFER_PERMISSION_ID(), ""));
     }
 
     function test_WhenCreatingANewDaoWithAnExistingToken() external {
-        address[] memory holders = new address[](2);
-        holders[0] = alice;
-        holders[1] = bob;
-        uint256[] memory balances = new uint256[](2);
-        balances[0] = 100 ether;
-        balances[1] = 50 ether;
+        address[] memory receivers = new address[](3);
+        receivers[0] = alice;
+        receivers[1] = alice;
+        receivers[2] = bob;
 
-        GovernanceERC20 existingToken = new GovernanceERC20(
-            IDAO(address(0)),
-            "Existing Token",
-            "EXIST",
-            GovernanceERC20.MintSettings(holders, balances, true)
-        );
+        GovernanceERC721 existingToken =
+            new GovernanceERC721(IDAO(address(0)), "Existing NFT", "EXIST", GovernanceERC721.MintSettings(receivers));
 
         InstallParams memory params = _defaultParams();
         params.existingToken = address(existingToken);
 
-        (DAO dao, TokenVoting plugin, IVotesUpgradeable token,) =
+        (DAO dao, NFTVoting plugin, IVotesUpgradeable token,) =
             script.createDaoAndInstall(daoFactory, _daoSettings(), params);
 
         assertTrue(
-            dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""),
-            "Plugin should be installed"
+            dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be installed"
         );
         assertEq(address(token), address(existingToken), "The plugin should use the provided token");
         assertTrue(plugin.isMember(alice), "Alice should be a member");
@@ -73,43 +71,37 @@ contract InstallTokenVotingTest is ForkTestBase {
     }
 
     function test_WhenInstallingOnAnExistingDao() external {
-        // Simulates a DAO that already exists and whose operator (this test contract) already
-        // holds EXECUTE_PERMISSION_ID on it — the documented precondition for this install path.
         DAO dao = build();
         dao.grant(address(dao), address(script), dao.EXECUTE_PERMISSION_ID());
 
-        (TokenVoting plugin, IVotesUpgradeable token, VotingPowerCondition condition) =
+        (NFTVoting plugin, IVotesUpgradeable token, VotingPowerCondition condition) =
             script.installOnExistingDao(dao, _defaultParams());
 
         assertTrue(
-            dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""),
-            "Plugin should be installed"
+            dao.isGranted(address(dao), address(plugin), dao.EXECUTE_PERMISSION_ID(), ""), "Plugin should be installed"
         );
         assertNotEq(address(token), address(0));
         assertNotEq(address(condition), address(0));
     }
 
-    /// @dev Full create -> vote -> execute cycle through a freshly installed plugin, proving the
-    ///     install actually produces a working governance setup and not just correctly-wired permissions.
+    /// @dev Full create -> vote -> execute cycle through a freshly installed plugin.
     function test_FullProposalLifecycle() external {
-        (DAO dao, TokenVoting plugin,,) =
-            script.createDaoAndInstall(daoFactory, _daoSettings(), _defaultParams());
+        InstallParams memory params = _defaultParams();
+        params.nftCount = 3;
 
-        // Move past the token mint's checkpoint so the proposal's voting-power snapshot sees it.
+        (DAO dao, NFTVoting plugin,,) = script.createDaoAndInstall(daoFactory, _daoSettings(), params);
+
+        // Move past the mint's checkpoint so the proposal's voting-power snapshot sees it.
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
 
         assertTrue(plugin.isMember(address(this)), "Deployer should hold voting power");
+        assertEq(plugin.totalVotingPower(block.number - 1), 3, "Three NFTs should be delegated");
 
         Action[] memory actions = new Action[](1);
-        actions[0] = Action({
-            to: address(dao),
-            value: 0,
-            data: abi.encodeCall(DAO.setMetadata, (bytes("e2e-test")))
-        });
+        actions[0] = Action({to: address(dao), value: 0, data: abi.encodeCall(DAO.setMetadata, (bytes("e2e-test")))});
 
-        uint256 proposalId =
-            plugin.createProposal("", actions, 0, 0, 0, IMajorityVoting.VoteOption.Yes, false);
+        uint256 proposalId = plugin.createProposal("", actions, 0, 0, 0, INFTVoting.VoteOption.Yes, false);
 
         (bool openBefore, bool executedBefore,,,,,) = plugin.getProposal(proposalId);
         assertTrue(openBefore, "Proposal should be open right after creation");
@@ -117,10 +109,7 @@ contract InstallTokenVotingTest is ForkTestBase {
 
         vm.warp(block.timestamp + 1 hours + 1);
 
-        assertTrue(
-            plugin.canExecute(proposalId),
-            "Proposal should be executable after reaching quorum and ending"
-        );
+        assertTrue(plugin.canExecute(proposalId), "Proposal should be executable after reaching quorum and ending");
 
         plugin.execute(proposalId);
 
@@ -129,29 +118,22 @@ contract InstallTokenVotingTest is ForkTestBase {
     }
 
     function _daoSettings() internal pure returns (DAOFactory.DAOSettings memory) {
-        return DAOFactory.DAOSettings({
-            trustedForwarder: address(0),
-            daoURI: "http://host/",
-            subdomain: "",
-            metadata: ""
-        });
+        return
+            DAOFactory.DAOSettings({trustedForwarder: address(0), daoURI: "http://host/", subdomain: "", metadata: ""});
     }
 
     function _defaultParams() internal pure returns (InstallParams memory params) {
-        params.votingSettings = IMajorityVoting.VotingSettings({
-            votingMode: IMajorityVoting.VotingMode.Standard,
+        params.votingSettings = INFTVoting.VotingSettings({
+            votingMode: INFTVoting.VotingMode.Standard,
             supportThreshold: 500_000,
             minParticipation: 100_000,
             minDuration: 1 hours,
             minProposerVotingPower: 0
         });
 
-        params.tokenName = "Test Token";
-        params.tokenSymbol = "TST";
-        params.selfDelegateOnMint = true;
-        params.targetConfig = IPlugin.TargetConfig({
-            target: address(0),
-            operation: IPlugin.Operation.Call
-        });
+        params.tokenName = "Test NFT";
+        params.tokenSymbol = "TNFT";
+        params.nftCount = 1;
+        params.targetConfig = IPlugin.TargetConfig({target: address(0), operation: IPlugin.Operation.Call});
     }
 }

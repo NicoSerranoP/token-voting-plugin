@@ -11,132 +11,33 @@ import {_applyRatioCeiled} from "@aragon/osx-commons-contracts/src/utils/math/Ra
 
 import {IVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/IVotesUpgradeable.sol";
 import {SafeCastUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
-import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {IERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
+import {IERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC165Upgradeable.sol";
 import {IERC6372Upgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC6372Upgradeable.sol";
 
-import {ProposalUpgradeable} from "@aragon/osx-commons-contracts/src/plugin/extensions/proposal/ProposalUpgradeable.sol";
+import {
+    ProposalUpgradeable
+} from "@aragon/osx-commons-contracts/src/plugin/extensions/proposal/ProposalUpgradeable.sol";
 import {RATIO_BASE, RatioOutOfBounds} from "@aragon/osx-commons-contracts/src/utils/math/Ratio.sol";
 import {PluginCloneable} from "@aragon/osx-commons-contracts/src/plugin/PluginCloneable.sol";
-import {MetadataExtensionUpgradeable} from
-    "@aragon/osx-commons-contracts/src/utils/metadata/MetadataExtensionUpgradeable.sol";
+import {
+    MetadataExtensionUpgradeable
+} from "@aragon/osx-commons-contracts/src/utils/metadata/MetadataExtensionUpgradeable.sol";
 
-import {IMajorityVoting} from "./base/IMajorityVoting.sol";
+import {INFTVoting} from "./base/INFTVoting.sol";
 
-/// @title TokenVoting
-/// @author Aragon X - 2021-2025
-/// @notice The majority voting implementation using an
-///         [OpenZeppelin `Votes`](https://docs.openzeppelin.com/contracts/4.x/api/governance#Votes)
-///         compatible governance token.
-///
-/// ### Parameterization
-///
-/// We define two parameters
-/// $$\texttt{support} = \frac{N_\text{yes}}{N_\text{yes} + N_\text{no}} \in [0,1]$$
-/// and
-/// $$\texttt{participation} = \frac{N_\text{yes} + N_\text{no} + N_\text{abstain}}{N_\text{total}} \in [0,1],$$
-/// where $N_\text{yes}$, $N_\text{no}$, and $N_\text{abstain}$ are the yes, no, and abstain votes that have been
-/// cast and $N_\text{total}$ is the total voting power available at proposal creation time.
-///
-/// #### Limit Values: Support Threshold & Minimum Participation
-///
-/// Two limit values are associated with these parameters and decide if a proposal execution should be possible:
-/// $\texttt{supportThreshold} \in [0,1)$ and $\texttt{minParticipation} \in [0,1]$.
-///
-/// For threshold values, $>$ comparison is used. This **does not** include the threshold value.
-/// E.g., for $\texttt{supportThreshold} = 50\%$,
-/// the criterion is fulfilled if there is at least one more yes than no votes ($N_\text{yes} = N_\text{no} + 1$).
-/// For minimum values, $\ge{}$ comparison is used. This **does** include the minimum participation value.
-/// E.g., for $\texttt{minParticipation} = 40\%$ and $N_\text{total} = 10$,
-/// the criterion is fulfilled if 4 out of 10 votes were casted.
-///
-/// Majority voting implies that the support threshold is set with
-/// $$\texttt{supportThreshold} \ge 50\% .$$
-/// However, this is not enforced by the contract code and developers can make unsafe parameters and
-/// only the frontend will warn about bad parameter settings.
-///
-/// ### Execution Criteria
-///
-/// After the vote is closed, two criteria decide if the proposal passes.
-///
-/// #### The Support Criterion
-///
-/// For a proposal to pass, the required ratio of yes and no votes must be met:
-/// $$(1- \texttt{supportThreshold}) \cdot N_\text{yes} > \texttt{supportThreshold} \cdot N_\text{no}.$$
-/// Note, that the inequality yields the simple majority voting condition for $\texttt{supportThreshold}=\frac{1}{2}$.
-///
-/// #### The Participation Criterion
-///
-/// For a proposal to pass, the minimum voting power must have been cast:
-/// $$N_\text{yes} + N_\text{no} + N_\text{abstain} \ge \texttt{minVotingPower},$$
-/// where $\texttt{minVotingPower} = \texttt{minParticipation} \cdot N_\text{total}$.
-///
-/// ### Vote Replacement
-///
-/// The contract allows votes to be replaced. Voters can vote multiple times
-/// and only the latest voteOption is tallied.
-///
-/// ### Early Execution
-///
-/// This contract allows a proposal to be executed early,
-/// iff the vote outcome cannot change anymore by more people voting.
-/// Accordingly, vote replacement and early execution are mutually exclusive options.
-/// The outcome cannot change anymore
-/// iff the support threshold is met even if all remaining votes are no votes.
-/// We call this number the worst-case number of no votes and define it as
-///
-/// $$N_\text{no, worst-case} = N_\text{no} + \texttt{remainingVotes}$$
-///
-/// where
-///
-/// $$\texttt{remainingVotes} =
-/// N_\text{total}-\underbrace{(N_\text{yes}+N_\text{no}+N_\text{abstain})}_{\text{turnout}}.$$
-///
-/// We can use this quantity to calculate the worst-case support that would be obtained
-/// if all remaining votes are casted with no:
-///
-/// $$
-/// \begin{align*}
-///   \texttt{worstCaseSupport}
-///   &= \frac{N_\text{yes}}{N_\text{yes} + (N_\text{no, worst-case})} \\[3mm]
-///   &= \frac{N_\text{yes}}{N_\text{yes} + (N_\text{no} + \texttt{remainingVotes})} \\[3mm]
-///   &= \frac{N_\text{yes}}{N_\text{yes} +  N_\text{no} + N_\text{total}
-///      - (N_\text{yes} + N_\text{no} + N_\text{abstain})} \\[3mm]
-///   &= \frac{N_\text{yes}}{N_\text{total} - N_\text{abstain}}
-/// \end{align*}
-/// $$
-///
-/// In analogy, we can modify [the support criterion](#the-support-criterion)
-/// from above to allow for early execution:
-///
-/// $$
-/// \begin{align*}
-///   (1 - \texttt{supportThreshold}) \cdot N_\text{yes}
-///   &> \texttt{supportThreshold} \cdot  N_\text{no, worst-case} \\[3mm]
-///   &> \texttt{supportThreshold} \cdot (N_\text{no} + \texttt{remainingVotes}) \\[3mm]
-///   &> \texttt{supportThreshold} \cdot (N_\text{no}
-///     + N_\text{total}-(N_\text{yes}+N_\text{no}+N_\text{abstain})) \\[3mm]
-///   &> \texttt{supportThreshold} \cdot (N_\text{total} - N_\text{yes} - N_\text{abstain})
-/// \end{align*}
-/// $$
-///
-/// Accordingly, early execution is possible when the vote is open,
-///     the modified support criterion, and the particicpation criterion are met.
-/// @dev This contract implements the `IMajorityVoting` interface.
-/// @custom:security-contact sirt@aragon.org
-contract TokenVoting is
-    IMembership,
-    IMajorityVoting,
-    MetadataExtensionUpgradeable,
-    PluginCloneable,
-    ProposalUpgradeable
-{
+/// @title NFTVoting
+/// @author NicoSerranoP (fork of Aragon X 2021-2025)
+/// @dev  See the "How voting works" section in README.md
+contract NFTVoting is IMembership, INFTVoting, MetadataExtensionUpgradeable, PluginCloneable, ProposalUpgradeable {
     using SafeCastUpgradeable for uint256;
 
     /// @notice The [ERC-165](https://eips.ethereum.org/EIPS/eip-165) interface ID of the contract.
     /// @dev use keccak string due to 2 createProposal functions declared in the contract
-    bytes4 internal constant MAJORITY_VOTING_BASE_INTERFACE_ID = this.minDuration.selector ^ this.getVotingToken.selector
-        ^ this.minProposerVotingPower.selector ^ this.votingMode.selector ^ this.totalVotingPower.selector
-        ^ this.getProposal.selector ^ this.updateVotingSettings.selector ^ this.updateMinApprovals.selector
+    bytes4 internal constant MAJORITY_VOTING_BASE_INTERFACE_ID = this.minDuration.selector
+        ^ this.getVotingToken.selector ^ this.minProposerVotingPower.selector ^ this.votingMode.selector
+        ^ this.totalVotingPower.selector ^ this.getProposal.selector ^ this.updateVotingSettings.selector
+        ^ this.updateMinApprovals.selector
         ^ bytes4(keccak256("createProposal(bytes,(address,uint256,bytes)[],uint256,uint64,uint64,uint8,bool)"));
 
     /// @notice The ID of the permission required to call the `updateVotingSettings` function.
@@ -160,17 +61,12 @@ contract TokenVoting is
     uint256 private minApprovals; // added in v1.3
 
     /// @notice An [OpenZeppelin `Votes`](https://docs.openzeppelin.com/contracts/4.x/api/governance#Votes)
-    ///         compatible contract referencing the token being used for voting.
+    ///         compatible contract referencing the [ERC-721](https://eips.ethereum.org/EIPS/eip-721)
+    ///         token being used for voting.
     IVotesUpgradeable private votingToken; // Slot 0
 
     /// @notice Wether the token contract indexes past voting power by timestamp.
     bool public tokenIndexedByTimestamp; // Slot 0
-
-    /// @notice Thrown if the voting power is zero
-    error NoVotingPower();
-
-    /// @notice Thrown if the token reports an inconsistent clock mode and clock value
-    error TokenClockMismatch();
 
     modifier onlyIfProposalExists(uint256 _proposalId) {
         if (!_proposalExists(_proposalId)) {
@@ -183,7 +79,7 @@ contract TokenVoting is
     /// @dev This method is required to support [ERC-1822](https://eips.ethereum.org/EIPS/eip-1822).
     /// @param _dao The IDAO interface of the associated DAO.
     /// @param _votingSettings The voting settings.
-    /// @param _token The [ERC-20](https://eips.ethereum.org/EIPS/eip-20) token to use for voting.
+    /// @param _token The [ERC-721](https://eips.ethereum.org/EIPS/eip-721) token to use for voting.
     ///     If the given token implements https://eips.ethereum.org/EIPS/eip-6372,
     ///     then `CLOCK_MODE()` or `clock()` will determine the clock type used by the plugin.
     ///     The token will be assumed to use a block number based clock otherwise.
@@ -201,6 +97,8 @@ contract TokenVoting is
         uint256 _minApprovals,
         bytes calldata _pluginMetadata
     ) external initializer {
+        require(IERC165Upgradeable(address(_token)).supportsInterface(type(IERC721Upgradeable).interfaceId), "token is not a ERC721");
+
         __PluginCloneable_init(_dao);
         _updateVotingSettings(_votingSettings);
         _updateMinApprovals(_minApprovals);
@@ -224,10 +122,8 @@ contract TokenVoting is
         override(MetadataExtensionUpgradeable, PluginCloneable, ProposalUpgradeable)
         returns (bool)
     {
-        return _interfaceId == type(IMembership).interfaceId
-            || _interfaceId == type(IMajorityVoting).interfaceId
-            || _interfaceId == MAJORITY_VOTING_BASE_INTERFACE_ID
-            || super.supportsInterface(_interfaceId);
+        return _interfaceId == type(IMembership).interfaceId || _interfaceId == type(INFTVoting).interfaceId
+            || _interfaceId == MAJORITY_VOTING_BASE_INTERFACE_ID || super.supportsInterface(_interfaceId);
     }
 
     /// @notice getter function for the voting token.
@@ -238,15 +134,16 @@ contract TokenVoting is
         return votingToken;
     }
 
-    /// @notice Returns the total voting power checkpointed for a specific timestamp or block number, subtracting the balance of excluded addresses.
+    /// @notice Returns the total voting power checkpointed for a specific timestamp or block number.
+    /// @dev For an [ERC-721](https://eips.ethereum.org/EIPS/eip-721) `Votes` token this equals the number of
+    ///     tokens that have been delegated (and are therefore authorized to vote) at `_timePoint`, since each
+    ///     token counts as exactly one unit of voting power.
     /// @param _timePoint The block number or timestamp.
-    /// @return The effective voting power.
+    /// @return The total voting power.
     function totalVotingPower(uint256 _timePoint) public view returns (uint256) {
-        // TODO: return the number of authorized NFTs to vote at a specific time period
         return votingToken.getPastTotalSupply(_timePoint);
     }
 
-    /// @inheritdoc IMajorityVoting
     function vote(uint256 _proposalId, VoteOption _voteOption, bool _tryEarlyExecution) public virtual {
         address account = _msgSender();
 
@@ -256,7 +153,7 @@ contract TokenVoting is
         _vote(_proposalId, _voteOption, account, _tryEarlyExecution);
     }
 
-        /// @notice Internal function to cast a vote. It assumes the queried proposal exists.
+    /// @notice Internal function to cast a vote. It assumes the queried proposal exists.
     /// @param _proposalId The ID of the proposal.
     /// @param _voteOption The chosen vote option to be casted on the proposal vote.
     /// @param _voter The address of the account that is voting on the `_proposalId`.
@@ -311,7 +208,7 @@ contract TokenVoting is
     function execute(uint256 _proposalId)
         public
         virtual
-        override(IMajorityVoting, IProposal)
+        override(IProposal)
         auth(EXECUTE_PROPOSAL_PERMISSION_ID)
     {
         if (!_canExecute(_proposalId)) {
@@ -338,12 +235,10 @@ contract TokenVoting is
         emit ProposalExecuted(_proposalId);
     }
 
-    /// @inheritdoc IMajorityVoting
     function getVoteOption(uint256 _proposalId, address _voter) public view virtual returns (VoteOption) {
         return proposals[_proposalId].voters[_voter];
     }
 
-    /// @inheritdoc IMajorityVoting
     function canVote(uint256 _proposalId, address _account, VoteOption _voteOption)
         public
         view
@@ -354,13 +249,51 @@ contract TokenVoting is
         return _canVote(_proposalId, _account, _voteOption);
     }
 
-    /// @inheritdoc IMajorityVoting
+    /// @notice Internal function to check if a voter can vote. It assumes the queried proposal exists.
+    /// @param _proposalId The ID of the proposal.
+    /// @param _account The address of the voter to check.
+    /// @param _voteOption Whether the voter abstains, supports or opposes the proposal.
+    /// @return Returns `true` if the given voter can vote on a certain proposal and `false` otherwise.
+    function _canVote(uint256 _proposalId, address _account, VoteOption _voteOption)
+        internal
+        view
+        virtual
+        returns (bool)
+    {
+        Proposal storage proposal_ = proposals[_proposalId];
+
+        // The proposal vote hasn't started or has already ended.
+        if (!_isProposalOpen(proposal_)) {
+            return false;
+        }
+
+        // The voter votes `None` which is not allowed.
+        if (_voteOption == VoteOption.None) {
+            return false;
+        }
+
+        // The voter has no voting power.
+        if (votingToken.getPastVotes(_account, proposal_.parameters.snapshotTimepoint) == 0) {
+            return false;
+        }
+
+        // The voter has already voted but vote replacment is not allowed.
+        if (
+            proposal_.voters[_account] != VoteOption.None
+                && proposal_.parameters.votingMode != VotingMode.VoteReplacement
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
     function canExecute(uint256 _proposalId)
         public
         view
         virtual
+        override(IProposal)
         onlyIfProposalExists(_proposalId)
-        override(IMajorityVoting, IProposal)
         returns (bool)
     {
         return _canExecute(_proposalId);
@@ -389,13 +322,7 @@ contract TokenVoting is
     }
 
     /// @inheritdoc IProposal
-    function hasSucceeded(uint256 _proposalId)
-        public
-        view
-        virtual
-        onlyIfProposalExists(_proposalId)
-        returns (bool)
-    {
+    function hasSucceeded(uint256 _proposalId) public view virtual onlyIfProposalExists(_proposalId) returns (bool) {
         Proposal storage proposal_ = proposals[_proposalId];
         bool isProposalOpen = _isProposalOpen(proposal_);
 
@@ -438,56 +365,41 @@ contract TokenVoting is
         return true;
     }
 
-    /// @inheritdoc IMajorityVoting
     function isSupportThresholdReached(uint256 _proposalId) public view virtual returns (bool) {
         Proposal storage proposal_ = proposals[_proposalId];
 
-        // The code below implements the formula of the support criterion explained in the top of this file.
-        // `(1 - supportThreshold) * N_yes > supportThreshold *  N_no`
         return (RATIO_BASE - proposal_.parameters.supportThreshold) * proposal_.tally.yes
             > proposal_.parameters.supportThreshold * proposal_.tally.no;
     }
 
-    /// @inheritdoc IMajorityVoting
     function isSupportThresholdReachedEarly(uint256 _proposalId) public view virtual returns (bool) {
         Proposal storage proposal_ = proposals[_proposalId];
 
         uint256 noVotesWorstCase =
             totalVotingPower(proposal_.parameters.snapshotTimepoint) - proposal_.tally.yes - proposal_.tally.abstain;
 
-        // The code below implements the formula of the
-        // early execution support criterion explained in the top of this file.
-        // `(1 - supportThreshold) * N_yes > supportThreshold *  N_no,worst-case`
         return (RATIO_BASE - proposal_.parameters.supportThreshold) * proposal_.tally.yes
             > proposal_.parameters.supportThreshold * noVotesWorstCase;
     }
 
-    /// @inheritdoc IMajorityVoting
     function isMinParticipationReached(uint256 _proposalId) public view virtual returns (bool) {
         Proposal storage proposal_ = proposals[_proposalId];
 
-        // The code below implements the formula of the
-        // participation criterion explained in the top of this file.
-        // `N_yes + N_no + N_abstain >= minVotingPower = minParticipation * N_total`
         return proposal_.tally.yes + proposal_.tally.no + proposal_.tally.abstain >= proposal_.parameters.minVotingPower;
     }
 
-    /// @inheritdoc IMajorityVoting
     function isMinApprovalReached(uint256 _proposalId) public view virtual returns (bool) {
         return proposals[_proposalId].tally.yes >= proposals[_proposalId].minApprovalPower;
     }
 
-    /// @inheritdoc IMajorityVoting
     function minApproval() public view virtual returns (uint256) {
         return minApprovals;
     }
 
-    /// @inheritdoc IMajorityVoting
     function supportThreshold() public view virtual returns (uint32) {
         return votingSettings.supportThreshold;
     }
 
-    /// @inheritdoc IMajorityVoting
     function minParticipation() public view virtual returns (uint32) {
         return votingSettings.minParticipation;
     }
@@ -565,7 +477,7 @@ contract TokenVoting is
         _updateVotingSettings(_votingSettings);
     }
 
-        /// @notice Internal function to update the plugin-wide proposal settings.
+    /// @notice Internal function to update the plugin-wide proposal settings.
     /// @param _votingSettings The voting settings to be validated and updated.
     function _updateVotingSettings(VotingSettings calldata _votingSettings) internal virtual {
         // Require the support threshold value to be in the interval [0, 10^6-1],
@@ -606,7 +518,7 @@ contract TokenVoting is
         _updateMinApprovals(_minApprovals);
     }
 
-        /// @notice Internal function to update minimal approval value.
+    /// @notice Internal function to update minimal approval value.
     /// @param _minApprovals The new minimal approval value.
     function _updateMinApprovals(uint256 _minApprovals) internal virtual {
         // Require the minimum approval value to be in the interval [0, 10^6],
@@ -742,47 +654,8 @@ contract TokenVoting is
 
     /// @inheritdoc IMembership
     function isMember(address _account) external view returns (bool) {
-        // A member must own at least one token or have at least one token delegated to her/him.
-        return votingToken.getVotes(_account) > 0 || IERC20Upgradeable(address(votingToken)).balanceOf(_account) > 0;
-    }
-
-    /// @notice Internal function to check if a voter can vote. It assumes the queried proposal exists.
-    /// @param _proposalId The ID of the proposal.
-    /// @param _account The address of the voter to check.
-    /// @param _voteOption Whether the voter abstains, supports or opposes the proposal.
-    /// @return Returns `true` if the given voter can vote on a certain proposal and `false` otherwise.
-    function _canVote(uint256 _proposalId, address _account, VoteOption _voteOption)
-        internal
-        view
-        virtual
-        returns (bool)
-    {
-        Proposal storage proposal_ = proposals[_proposalId];
-
-        // The proposal vote hasn't started or has already ended.
-        if (!_isProposalOpen(proposal_)) {
-            return false;
-        }
-
-        // The voter votes `None` which is not allowed.
-        if (_voteOption == VoteOption.None) {
-            return false;
-        }
-
-        // The voter has no voting power.
-        if (votingToken.getPastVotes(_account, proposal_.parameters.snapshotTimepoint) == 0) {
-            return false;
-        }
-
-        // The voter has already voted but vote replacment is not allowed.
-        if (
-            proposal_.voters[_account] != VoteOption.None
-                && proposal_.parameters.votingMode != VotingMode.VoteReplacement
-        ) {
-            return false;
-        }
-
-        return true;
+        // A member must have at least one token delegated to her/him or own at least one token at current time.
+        return votingToken.getVotes(_account) > 0 || IERC721Upgradeable(address(votingToken)).balanceOf(_account) > 0;
     }
 
     /// @notice Checks if proposal exists or not.
@@ -849,6 +722,7 @@ contract TokenVoting is
             tokenIndexedByTimestamp = true;
         } else {
             // Assuming that the token indexes by block number
+            tokenIndexedByTimestamp = false;
         }
     }
 }

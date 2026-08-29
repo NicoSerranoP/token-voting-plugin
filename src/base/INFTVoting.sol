@@ -5,11 +5,10 @@ pragma solidity ^0.8.8;
 import {Action} from "@aragon/osx-commons-contracts/src/executors/IExecutor.sol";
 import {IPlugin} from "@aragon/osx-commons-contracts/src/plugin/IPlugin.sol";
 
-/// @title IMajorityVoting
-/// @author Aragon X - 2022-2025
+/// @title INFTVoting
+/// @author NicoSerranoP (fork of Aragon X 2022-2025)
 /// @notice The interface of majority voting plugin.
-/// @custom:security-contact sirt@aragon.org
-interface IMajorityVoting {
+interface INFTVoting {
     /// @notice The different voting modes available.
     /// @param Standard In standard mode, early execution and vote replacement are disabled.
     /// @param EarlyExecution In early execution mode, a proposal can be executed
@@ -73,7 +72,7 @@ interface IMajorityVoting {
         bool executed;
         ProposalParameters parameters;
         Tally tally;
-        mapping(address => IMajorityVoting.VoteOption) voters;
+        mapping(address => VoteOption) voters;
         Action[] actions;
         uint256 allowFailureMap;
         uint256 minApprovalPower;
@@ -132,7 +131,7 @@ interface IMajorityVoting {
     /// @param minApprovals The minimum amount of yes votes needed for a proposal succeed.
     event VotingMinApprovalUpdated(uint256 minApprovals);
 
-        /// @notice Thrown if a date is out of bounds.
+    /// @notice Thrown if a date is out of bounds.
     /// @param limit The limit value.
     /// @param actual The actual value.
     error DateOutOfBounds(uint64 limit, uint64 actual);
@@ -164,80 +163,9 @@ interface IMajorityVoting {
     /// @param proposalId The id of the proposal.
     error ProposalAlreadyExists(uint256 proposalId);
 
-    /// @notice Returns the support threshold parameter stored in the voting settings.
-    /// @return The support threshold parameter.
-    function supportThreshold() external view returns (uint32);
+    /// @notice Thrown if the token reports an inconsistent clock mode and clock value
+    error TokenClockMismatch();
 
-    /// @notice Returns the configured minimum approval value.
-    /// @return The minimal approval value.
-    function minApproval() external view returns (uint256);
-
-    /// @notice Returns the minimum participation parameter stored in the voting settings.
-    /// @return The minimum participation parameter.
-    function minParticipation() external view returns (uint32);
-
-    /// @notice Checks if the support value defined as:
-    ///     $$\texttt{support} = \frac{N_\text{yes}}{N_\text{yes}+N_\text{no}}$$
-    ///     for a proposal is greater than the support threshold.
-    /// @param _proposalId The ID of the proposal.
-    /// @return Returns `true` if the  support is greater than the support threshold and `false` otherwise.
-    function isSupportThresholdReached(uint256 _proposalId) external view returns (bool);
-
-    /// @notice Checks if the worst-case support value defined as:
-    ///     $$\texttt{worstCaseSupport} = \frac{N_\text{yes}}{ N_\text{total}-N_\text{abstain}}$$
-    ///     for a proposal is greater than the support threshold.
-    /// @param _proposalId The ID of the proposal.
-    /// @return Returns `true` if the worst-case support is greater than the support threshold and `false` otherwise.
-    function isSupportThresholdReachedEarly(uint256 _proposalId) external view returns (bool);
-
-    /// @notice Checks if the participation value defined as:
-    ///     $$\texttt{participation} = \frac{N_\text{yes}+N_\text{no}+N_\text{abstain}}{N_\text{total}}$$
-    ///     for a proposal is greater or equal than the minimum participation value.
-    /// @param _proposalId The ID of the proposal.
-    /// @return Returns `true` if the participation is greater or equal than the minimum participation,
-    ///     and `false` otherwise.
-    function isMinParticipationReached(uint256 _proposalId) external view returns (bool);
-
-    /// @notice Checks if the min approval value defined as:
-    ///     $$\texttt{minApproval} = \frac{N_\text{yes}}{N_\text{total}}$$
-    ///     for a proposal is greater or equal than the minimum approval value.
-    /// @param _proposalId The ID of the proposal.
-    /// @return Returns `true` if the approvals is greater or equal than the minimum approval and `false` otherwise.
-    function isMinApprovalReached(uint256 _proposalId) external view returns (bool);
-
-    /// @notice Checks if an account can participate on a proposal. This can be because the vote
-    /// - has not started,
-    /// - has ended,
-    /// - was executed, or
-    /// - the voter doesn't have voting powers.
-    /// @param _proposalId The proposal Id.
-    /// @param _account The account address to be checked.
-    /// @param _voteOption Whether the voter abstains, supports or opposes the proposal.
-    /// @return Returns true if the account is allowed to vote.
-    function canVote(uint256 _proposalId, address _account, VoteOption _voteOption) external view returns (bool);
-
-    /// @notice Checks if a proposal can be executed.
-    /// @param _proposalId The ID of the proposal to be checked.
-    /// @return True if the proposal can be executed, false otherwise.
-    function canExecute(uint256 _proposalId) external view returns (bool);
-
-    /// @notice Votes on a proposal and, optionally, executes the proposal.
-    /// @dev `_voteOption`, 1 -> abstain, 2 -> yes, 3 -> no
-    /// @param _proposalId The ID of the proposal.
-    /// @param _voteOption The chosen vote option.
-    /// @param _tryEarlyExecution If `true`,  early execution is tried after the vote cast.
-    ///     The call does not revert if early execution is not possible.
-    function vote(uint256 _proposalId, VoteOption _voteOption, bool _tryEarlyExecution) external;
-
-    /// @notice Executes a proposal.
-    /// @param _proposalId The ID of the proposal to be executed.
-    function execute(uint256 _proposalId) external;
-
-    /// @notice Returns whether the account has voted for the proposal.
-    /// @dev May return `none` if the `_proposalId` does not exist,
-    ///      or the `_account` does not have voting power.
-    /// @param _proposalId The ID of the proposal.
-    /// @param _account The account address to be checked.
-    /// @return The vote option cast by a voter for a certain proposal.
-    function getVoteOption(uint256 _proposalId, address _account) external view returns (VoteOption);
+    /// @notice Thrown if the voting power is zero
+    error NoVotingPower();
 }

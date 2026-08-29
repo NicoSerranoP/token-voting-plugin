@@ -16,3 +16,6 @@ optimizer = true
 optimizer-runs = 200
 solc = "0.8.28"
 via_ir = false
+
+# Suppress compiler warnings originating from dependency code (keeps warnings from src/test/script)
+ignored_warnings_from = ["lib"]

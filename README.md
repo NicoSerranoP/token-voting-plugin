@@ -1,4 +1,4 @@
-# Token Voting Plugin [![Foundry][foundry-badge]][foundry] [![License: AGPL v3][license-badge]][license]
+# NFT Voting Plugin [![Foundry][foundry-badge]][foundry] [![License: AGPL v3][license-badge]][license]
 
 [foundry]: https://getfoundry.sh/
 [foundry-badge]: https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg
@@ -7,54 +7,124 @@
 
 ## Features
 
-TokenVoting is an Aragon OSx Plugin, designed to conduct governance processes where the voting power of each member is determined by an [IVotes compatible token](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/utils/IVotes.sol).
+NFTVoting is an Aragon OSx Plugin, designed to conduct governance processes where the voting power of each member is determined by an [IVotes compatible](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/utils/IVotes.sol) [ERC-721](https://eips.ethereum.org/EIPS/eip-721) token. Each NFT counts as exactly one vote.
 
 Three voting modes:
 - Early execution: Execute when there's mathematical certainty that the proposal can't be defeated
 - Vote replacement: Allow to change votes until the proposal ends
 - Standard mode: No vote replacement or early execution.
 
-Two token contracts are provided for convenience:
-- GovernanceERC20: Mint a new token with a predefined set of addresses to mint for
-- GovernanceWrappedERC20: Wrap an existing token that does not support [IVotes](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/utils/IVotes.sol) by itself
+One token contract is provided for convenience:
+- GovernanceERC721: Mint vote NFTs to a predefined set of addresses. Holders transfer with the standard `transferFrom` / `safeTransferFrom`; the DAO (or whoever holds the permission) can force-transfer via `adminTransfer` and revoke via `burn`.
 
-If you already have an IVotes compatible token, you can simply import it.
+If you already have an IVotes compatible ERC-721 token, you can simply import it.
 
 Other features:
-- Excluding balances from certain accounts (non-circulating supply, e.g. vaults, the DAO's own holdings, etc)
-- Mint freezing
-- Granular permission management for proposal creation, proposal execution, token minting
-- Minimum balance requirements for proposers
+- Automatic self-delegation on mint/transfer, so every NFT counts unless the holder delegates elsewhere
+- Granular permission management for proposal creation, proposal execution, token minting/burning/transfer
+- Minimum voting power requirements for proposers
 
-## Project structure
+## How voting works
 
-```
-├── justfile              # task launcher (imports lib/just-foundry)
-├── foundry.toml
-├── remappings.txt
-├── lib
-│   └── just-foundry      # shared just recipes + network configs (submodule)
-├── script
-│   └── InstallTokenVoting.s.sol   # installs the plugin onto a new or existing DAO
-├── src
-│   ├── TokenVoting.sol
-│   ├── TokenVotingSetup.sol       # the plugin's PluginSetup, for installs via the Aragon App/PSP
-│   ├── base
-│   │   ├── IMajorityVoting.sol
-│   │   └── MajorityVotingBase.sol
-│   ├── condition
-│   │   └── VotingPowerCondition.sol
-│   └── erc20
-│       ├── GovernanceERC20.sol
-│       ├── GovernanceWrappedERC20.sol
-│       ├── IERC20MintableUpgradeable.sol
-│       └── IGovernanceWrappedERC20.sol
-└── test
-    ├── *.t.sol            # unit tests
-    ├── fork-tests           # e2e tests against a real OSx deployment (DAOFactory) on a fork
-    ├── lib
-    └── mocks
-```
+`NFTVoting` is the majority voting implementation. Voting power comes from an
+[OpenZeppelin `Votes`](https://docs.openzeppelin.com/contracts/4.x/api/governance#Votes) compatible
+[ERC-721](https://eips.ethereum.org/EIPS/eip-721) governance token, where each token counts as exactly
+one unit of voting power.
+
+### Parameterization
+
+We define two parameters
+
+$$\texttt{support} = \frac{N_\text{yes}}{N_\text{yes} + N_\text{no}} \in [0,1]$$
+
+and
+
+$$\texttt{participation} = \frac{N_\text{yes} + N_\text{no} + N_\text{abstain}}{N_\text{total}} \in [0,1],$$
+
+where $N_\text{yes}$, $N_\text{no}$, and $N_\text{abstain}$ are the yes, no, and abstain votes that have
+been cast and $N_\text{total}$ is the total voting power available at proposal creation time.
+
+#### Limit Values: Support Threshold & Minimum Participation
+
+Two limit values are associated with these parameters and decide if a proposal execution should be
+possible: $\texttt{supportThreshold} \in [0,1)$ and $\texttt{minParticipation} \in [0,1]$.
+
+For threshold values, $>$ comparison is used. This **does not** include the threshold value.
+E.g., for $\texttt{supportThreshold} = 50\%$, the criterion is fulfilled if there is at least one more
+yes than no votes ($N_\text{yes} = N_\text{no} + 1$). For minimum values, $\ge{}$ comparison is used.
+This **does** include the minimum participation value. E.g., for $\texttt{minParticipation} = 40\%$ and
+$N_\text{total} = 10$, the criterion is fulfilled if 4 out of 10 votes were casted.
+
+Majority voting implies that the support threshold is set with
+$$\texttt{supportThreshold} \ge 50\% .$$
+However, this is not enforced by the contract code and developers can make unsafe parameters and only
+the frontend will warn about bad parameter settings.
+
+### Execution Criteria
+
+After the vote is closed, two criteria decide if the proposal passes.
+
+#### The Support Criterion
+
+For a proposal to pass, the required ratio of yes and no votes must be met:
+$$(1- \texttt{supportThreshold}) \cdot N_\text{yes} > \texttt{supportThreshold} \cdot N_\text{no}.$$
+Note, that the inequality yields the simple majority voting condition for
+$\texttt{supportThreshold}=\frac{1}{2}$.
+
+#### The Participation Criterion
+
+For a proposal to pass, the minimum voting power must have been cast:
+$$N_\text{yes} + N_\text{no} + N_\text{abstain} \ge \texttt{minVotingPower},$$
+where $\texttt{minVotingPower} = \texttt{minParticipation} \cdot N_\text{total}$.
+
+### Vote Replacement
+
+The contract allows votes to be replaced. Voters can vote multiple times and only the latest
+voteOption is tallied.
+
+### Early Execution
+
+This contract allows a proposal to be executed early, iff the vote outcome cannot change anymore by
+more people voting. Accordingly, vote replacement and early execution are mutually exclusive options.
+The outcome cannot change anymore iff the support threshold is met even if all remaining votes are no
+votes. We call this number the worst-case number of no votes and define it as
+
+$$N_\text{no, worst-case} = N_\text{no} + \texttt{remainingVotes}$$
+
+where
+
+$$\texttt{remainingVotes} =
+N_\text{total}-\underbrace{(N_\text{yes}+N_\text{no}+N_\text{abstain})}_{\text{turnout}}.$$
+
+We can use this quantity to calculate the worst-case support that would be obtained if all remaining
+votes are casted with no:
+
+$$
+\begin{align*}
+  \texttt{worstCaseSupport}
+  &= \frac{N_\text{yes}}{N_\text{yes} + (N_\text{no, worst-case})} \\[3mm]
+  &= \frac{N_\text{yes}}{N_\text{yes} + (N_\text{no} + \texttt{remainingVotes})} \\[3mm]
+  &= \frac{N_\text{yes}}{N_\text{yes} +  N_\text{no} + N_\text{total}
+     - (N_\text{yes} + N_\text{no} + N_\text{abstain})} \\[3mm]
+  &= \frac{N_\text{yes}}{N_\text{total} - N_\text{abstain}}
+\end{align*}
+$$
+
+In analogy, we can modify the support criterion from above to allow for early execution:
+
+$$
+\begin{align*}
+  (1 - \texttt{supportThreshold}) \cdot N_\text{yes}
+  &> \texttt{supportThreshold} \cdot  N_\text{no, worst-case} \\[3mm]
+  &> \texttt{supportThreshold} \cdot (N_\text{no} + \texttt{remainingVotes}) \\[3mm]
+  &> \texttt{supportThreshold} \cdot (N_\text{no}
+    + N_\text{total}-(N_\text{yes}+N_\text{no}+N_\text{abstain})) \\[3mm]
+  &> \texttt{supportThreshold} \cdot (N_\text{total} - N_\text{yes} - N_\text{abstain})
+\end{align*}
+$$
+
+Accordingly, early execution is possible when the vote is open, the modified support criterion, and
+the participation criterion are met.
 
 ## Prerequisites
 - [Foundry](https://getfoundry.sh/)
@@ -121,11 +191,11 @@ just test-fork     # fork tests (requires a reachable RPC_URL for the active net
 just test-coverage # HTML coverage report under ./report
 ```
 
-`just test` checks the logic's accordance to the specs; `just test-fork` additionally requires `RPC_URL` (from the selected network or `.env`) and exercises the full install flow (`script/InstallTokenVoting.s.sol`) against a real `DAOFactory` on a fork, including a full create → vote → execute proposal cycle.
+`just test` checks the logic's accordance to the specs; `just test-fork` additionally requires `RPC_URL` (from the selected network or `.env`) and exercises the full install flow (`script/InstallNFTVoting.s.sol`) against a real `DAOFactory` on a fork, including a full create → vote → execute proposal cycle.
 
 ## Installing the plugin
 
-`script/InstallTokenVoting.s.sol` deploys and initializes the `TokenVoting` plugin directly (no `PluginSetupProcessor`/`PluginRepo` involved) and wires up the same permissions the plugin's own `TokenVotingSetup.prepareInstallation` would grant. It supports two flows, selected by `EXISTING_DAO_ADDRESS`:
+`script/InstallNFTVoting.s.sol` deploys and initializes the `NFTVoting` plugin directly (no `PluginSetupProcessor`/`PluginRepo` involved) and wires up its permissions. It supports two flows, selected by `EXISTING_DAO_ADDRESS`:
 
 - **New DAO** (default, `EXISTING_DAO_ADDRESS` unset): creates a DAO via Aragon's `DAOFactory` and installs the plugin on it in the same run.
 - **Existing DAO** (`EXISTING_DAO_ADDRESS` set): installs onto an already-deployed DAO. This requires the deployer key to already hold `EXECUTE_PERMISSION_ID` on that DAO — installing into an existing, fully decentralized DAO otherwise requires a governance proposal instead of a direct broadcast transaction.
@@ -181,12 +251,12 @@ When running a production deployment ceremony, you can use these steps as a refe
 
 - [ ] The deployment process completed with no errors
 - [ ] All the project's smart contracts are correctly verified on the reference block explorer of the target network.
-- [ ] The output of the latest `logs/InstallTokenVoting-<network>-<timestamp>.log` file corresponds to the console output
-- [ ] A file called `artifacts/install-<network>-<timestamp>.json` has been created, and the addresses match those logged to the screen
+- [ ] The output of the latest `logs/InstallNFTVoting-<network>-<timestamp>.log` file corresponds to the console output
+- [ ] A file called `artifacts/install-nft-<network>-<timestamp>.json` has been created, and the addresses match those logged to the screen
 - [ ] I have uploaded the following files to a shared location:
-  - `logs/InstallTokenVoting-<network>-<timestamp>.log` (the last one)
-  - `artifacts/install-<network>-<timestamp>.json`  (the last one)
-  - `broadcast/InstallTokenVoting.s.sol/<chain-id>/run-<timestamp>.json` (the last one, or `run-latest.json`)
+  - `logs/InstallNFTVoting-<network>-<timestamp>.log` (the last one)
+  - `artifacts/install-nft-<network>-<timestamp>.json`  (the last one)
+  - `broadcast/InstallNFTVoting.s.sol/<chain-id>/run-<timestamp>.json` (the last one, or `run-latest.json`)
 - [ ] The rest of members confirm that the values are correct
 - [ ] I have transferred the remaining funds of the deployment wallet to the address that originally funded it
   - `just refund`
@@ -205,7 +275,7 @@ just verify blockscout
 just verify sourcify
 ```
 
-These use the last deployment data under `broadcast/InstallTokenVoting.s.sol/<chain-id>/run-latest.json`.
+These use the last deployment data under `broadcast/InstallNFTVoting.s.sol/<chain-id>/run-latest.json`.
 - Ensure that the required variables are set within the `.env` file (or the active network).
 
 This flow will attempt to verify all the contracts in one go, but you may still need to issue additional manual verifications, depending on the circumstances.
