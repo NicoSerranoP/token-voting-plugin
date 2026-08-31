@@ -1,9 +1,13 @@
-# NFT Voting Plugin [![Foundry][foundry-badge]][foundry] [![License: AGPL v3][license-badge]][license]
+# Public sector DAO [![Foundry][foundry-badge]][foundry] [![License: AGPL v3][license-badge]][license]
 
 [foundry]: https://getfoundry.sh/
 [foundry-badge]: https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg
 [license]: https://opensource.org/licenses/AGPL-v3
 [license-badge]: https://img.shields.io/badge/License-AGPL_v3-blue.svg
+
+## Introduction
+
+This is a on-chain community participation platform where citizens will be able to register themselves using NFT tokens minted by an authorized stakeholder. Every project will be submitted as a proposal to the DAO and the voting process will be only open for token holders or delegated representatives.
 
 ## Features
 

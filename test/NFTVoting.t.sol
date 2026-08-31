@@ -303,9 +303,8 @@ contract NFTVotingTest is TestBase {
         );
 
         vm.prank(bob);
-        nft.setBaseURI("https://new-base-uri.com/");
-
         vm.expectRevert(expectedErr);
+        nft.setBaseURI("https://new-base-uri.com/");
     }
 
     // -----------------------------------------------------------------------
