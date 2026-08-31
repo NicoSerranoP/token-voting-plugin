@@ -29,7 +29,7 @@ import {INFTVoting} from "./base/INFTVoting.sol";
 /// @title NFTVoting
 /// @author NicoSerranoP (fork of Aragon X 2021-2025)
 /// @dev  See the "How voting works" section in README.md
-contract NFTVoting is IMembership, INFTVoting, MetadataExtensionUpgradeable, PluginCloneable, ProposalUpgradeable {
+contract NFTVoting is INFTVoting, IMembership, MetadataExtensionUpgradeable, PluginCloneable, ProposalUpgradeable {
     using SafeCastUpgradeable for uint256;
 
     /// @notice The [ERC-165](https://eips.ethereum.org/EIPS/eip-165) interface ID of the contract.

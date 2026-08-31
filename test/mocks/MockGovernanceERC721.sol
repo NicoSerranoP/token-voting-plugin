@@ -11,8 +11,8 @@ import {GovernanceERC721} from "../../src/erc721/GovernanceERC721.sol";
 /// @notice A test GovernanceERC721 that can be minted and burned by everyone.
 /// @dev DO NOT USE IN PRODUCTION!
 contract MockGovernanceERC721 is GovernanceERC721 {
-    constructor(IDAO _dao, string memory _name, string memory _symbol, MintSettings memory _mintSettings)
-        GovernanceERC721(_dao, _name, _symbol, _mintSettings)
+    constructor(IDAO _dao, TokenSettings memory _settings)
+        GovernanceERC721(_dao, _settings)
     {}
 
     /// @notice Mints the next sequential token id to `_to` without any permission check.

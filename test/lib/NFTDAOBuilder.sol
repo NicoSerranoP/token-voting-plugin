@@ -134,7 +134,14 @@ contract NFTDAOBuilder is TestBase {
                 newTokenReceivers.push(msg.sender);
             }
 
-            token_ = new GovernanceERC721(dao, "MyNFT", "SYM", GovernanceERC721.MintSettings(newTokenReceivers));
+            GovernanceERC721.TokenSettings memory settings = GovernanceERC721.TokenSettings({
+                name: "MyNFT",
+                symbol: "SYM",
+                baseURI: "https://example.com/",
+                receivers: newTokenReceivers
+            });
+
+            token_ = new GovernanceERC721(dao, settings);
         } else {
             token_ = token;
         }

@@ -51,13 +51,24 @@ contract GovernanceERC721 is
     /// @notice The permission identifier to force-transfer a token regardless of holder approval.
     bytes32 public constant TRANSFER_PERMISSION_ID = keccak256("TRANSFER_PERMISSION");
 
+    /// @notice The permission identifier to update the base URI for token metadata.
+    bytes32 public constant UPDATE_BASE_URI_ID = keccak256("UPDATE_BASE_URI");
+
     /// @notice The identifier that will be assigned to the next minted token. First token id is 1.
     uint256 private nextTokenId;
 
-    /// @notice The settings for the initial mint of the token.
-    /// @param receivers The receivers of the tokens. On initialization only. List an address `n` times
-    ///     to grant it `n` tokens (i.e. `n` votes).
-    struct MintSettings {
+    /// @notice The single URI where the metadata for each token is stored. Can be updated
+    string private baseTokenURI;
+
+    /// @notice The initialization settings of the token.
+    /// @param name The token name.
+    /// @param symbol The token symbol.
+    /// @param baseURI The URI holding the metadata of the token.
+    /// @param receivers of the tokens on initialization. List address `n` times to grant it `n` tokens/votes.
+    struct TokenSettings {
+        string name;
+        string symbol;
+        string baseURI;
         address[] receivers;
     }
 
@@ -69,29 +80,27 @@ contract GovernanceERC721 is
 
     /// @notice Calls the initialize function.
     /// @param _dao The managing DAO.
-    /// @param _name The name of the [ERC-721](https://eips.ethereum.org/EIPS/eip-721) governance token.
-    /// @param _symbol The symbol of the [ERC-721](https://eips.ethereum.org/EIPS/eip-721) governance token.
-    /// @param _mintSettings The token mint settings struct containing the `receivers`.
-    constructor(IDAO _dao, string memory _name, string memory _symbol, MintSettings memory _mintSettings) {
-        initialize(_dao, _name, _symbol, _mintSettings);
+    /// @param _settings Token settings for initialization
+    constructor(IDAO _dao, TokenSettings memory _settings) {
+        initialize(_dao, _settings);
     }
 
-    /// @notice Initializes the contract and mints one token per entry in `_mintSettings.receivers`.
+    /// @notice Initializes the contract and mints one token per entry in `_settings.receivers`.
     /// @param _dao The managing DAO.
-    /// @param _name The name of the [ERC-721](https://eips.ethereum.org/EIPS/eip-721) governance token.
-    /// @param _symbol The symbol of the [ERC-721](https://eips.ethereum.org/EIPS/eip-721) governance token.
-    /// @param _mintSettings The token mint settings struct containing the `receivers`.
-    function initialize(IDAO _dao, string memory _name, string memory _symbol, MintSettings memory _mintSettings)
+    /// @param _settings Token settings for initialization
+    function initialize(IDAO _dao, TokenSettings memory _settings)
         public
         initializer
     {
-        __ERC721_init(_name, _symbol);
+        __ERC721_init(_settings.name, _settings.symbol);
         // `ERC721Votes` relies on `EIP712` for `delegateBySig`, so it must be initialized explicitly.
-        __EIP712_init(_name, "1");
+        __EIP712_init(_settings.name, "1");
         __DaoAuthorizableUpgradeable_init(_dao);
 
-        for (uint256 i; i < _mintSettings.receivers.length;) {
-            _mintTo(_mintSettings.receivers[i]);
+        baseTokenURI = _settings.baseURI;
+
+        for (uint256 i; i < _settings.receivers.length;) {
+            _mintTo(_settings.receivers[i]);
 
             unchecked {
                 ++i;
@@ -164,5 +173,23 @@ contract GovernanceERC721 is
         if (to != address(0) && delegates(to) == address(0)) {
             _delegate(to, to);
         }
+    }
+
+    /// @notice Returns the base URI for the token metadata.
+    /// @return Returns the single base URI
+    function _baseURI() internal view override returns (string memory) {
+        return baseTokenURI;
+    }
+
+    /// @notice Public getter of base URI for the token metadata.
+    /// @return Returns the single base URI
+    function baseURI() external view returns (string memory) {
+        return _baseURI();
+    }
+
+    /// @notice Updates the base URI for the token metadata.
+    /// @param _baseTokenURI The new base URI to set.
+    function setBaseURI(string memory _baseTokenURI) external virtual auth(UPDATE_BASE_URI_ID) {
+        baseTokenURI = _baseTokenURI;
     }
 }

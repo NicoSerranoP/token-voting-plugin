@@ -175,8 +175,14 @@ contract NFTVotingTest is TestBase {
         _build(new address[](0)); // NFTDAOBuilder falls back to minting 1 NFT to msg.sender
 
         // Move the single NFT out via burn is not available here; instead build with a token that has supply 0.
-        MockGovernanceERC721 emptyToken =
-            new MockGovernanceERC721(IDAO(address(0)), "Empty", "MT", GovernanceERC721.MintSettings(new address[](0)));
+        GovernanceERC721.TokenSettings memory settings = GovernanceERC721.TokenSettings({
+            name: "Empty",
+            symbol: "MT",
+            baseURI: "https://example.com/",
+            receivers: new address[](0)
+        });
+
+        MockGovernanceERC721 emptyToken = new MockGovernanceERC721(IDAO(address(0)), settings);
         (dao, plugin,, condition) = new NFTDAOBuilder().withToken(IVotesUpgradeable(address(emptyToken))).build();
 
         dao.grant(address(plugin), alice, plugin.CREATE_PROPOSAL_PERMISSION_ID());
@@ -207,10 +213,10 @@ contract NFTVotingTest is TestBase {
         assertTrue(plugin.canVote(proposalId, bob, INFTVoting.VoteOption.Yes), "bob received the NFT");
     }
 
-    function test_WhenTheOwnerForceTransfersTheNFT_ItMovesWithoutHolderApproval() external {
+    function test_WhenTheAdminForceTransfersTheNFT_ItMovesWithoutHolderApproval() external {
         _build(_one(alice));
 
-        // Grant the test contract (a DAO ROOT) the force-transfer permission on the token.
+        // Grant the test contract the force-transfer permission: dao.grant(where, who, permission)
         dao.grant(address(nft), address(this), nft.TRANSFER_PERMISSION_ID());
 
         vm.expectEmit(true, true, true, true, address(nft));
@@ -238,8 +244,15 @@ contract NFTVotingTest is TestBase {
     // -----------------------------------------------------------------------
 
     function test_WhenAnNFTIsBurned_ItsVotingPowerIsRemoved() external {
-        MockGovernanceERC721 token_ =
-            new MockGovernanceERC721(IDAO(address(0)), "T", "T", GovernanceERC721.MintSettings(new address[](0)));
+        GovernanceERC721.TokenSettings memory settings = GovernanceERC721.TokenSettings({
+            name: "Test NFT",
+            symbol: "TNFT",
+            baseURI: "https://example.com/",
+            receivers: new address[](0)
+        });
+
+        MockGovernanceERC721 token_ = new MockGovernanceERC721(IDAO(address(0)), settings);
+
         token_.mintTo(alice);
         token_.mintTo(bob);
 
@@ -264,6 +277,35 @@ contract NFTVotingTest is TestBase {
         vm.prank(bob);
         vm.expectRevert(expectedErr);
         nft.burn(1);
+    }
+
+    // -----------------------------------------------------------------------
+    // update base URI
+    // -----------------------------------------------------------------------
+    function test_WhenTheAdminUpdatesTheBaseURI_ItSucceeds() external {
+        _build(_one(alice));
+
+        // Grant the test contract the update base URI permission: dao.grant(where, who, permission)
+        dao.grant(address(nft), address(this), nft.UPDATE_BASE_URI_ID());
+
+        string memory newBaseURI = "https://new-base-uri.com/";
+        nft.setBaseURI(newBaseURI);
+
+        assertEq(nft.baseURI(), newBaseURI);
+    }
+
+    function test_WhenANonAdminUpdatesTheBaseURI_ItReverts() external {
+        _build(_one(alice));
+
+        bytes memory expectedErr =
+            abi.encodeWithSelector(
+                DaoUnauthorized.selector, address(dao), address(nft), bob, nft.UPDATE_BASE_URI_ID()
+        );
+
+        vm.prank(bob);
+        nft.setBaseURI("https://new-base-uri.com/");
+
+        vm.expectRevert(expectedErr);
     }
 
     // -----------------------------------------------------------------------

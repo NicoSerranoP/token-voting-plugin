@@ -26,6 +26,7 @@ struct InstallParams {
     address existingToken;
     string tokenName;
     string tokenSymbol;
+    string baseTokenURI;
     uint256 nftCount;
     IPlugin.TargetConfig targetConfig; // target == address(0) resolves to the DAO itself
     uint256 minApprovals;
@@ -145,13 +146,19 @@ contract InstallNFTVotingScript is Script {
         uint256 count = _params.nftCount == 0 ? 1 : _params.nftCount;
         address receiver = deployer == address(0) ? msg.sender : deployer;
         address[] memory receivers = new address[](count);
+
         for (uint256 i; i < count; ++i) {
             receivers[i] = receiver;
         }
 
-        token_ = new GovernanceERC721(
-            IDAO(address(_dao)), _params.tokenName, _params.tokenSymbol, GovernanceERC721.MintSettings(receivers)
-        );
+        GovernanceERC721.TokenSettings memory settings = GovernanceERC721.TokenSettings({
+            name: _params.tokenName,
+            symbol: _params.tokenSymbol,
+            baseURI: _params.baseTokenURI,
+            receivers: receivers
+        });
+        token_ = new GovernanceERC721(IDAO(address(_dao)), settings);
+
         vm.label(address(token_), "Token");
     }
 
@@ -191,7 +198,7 @@ contract InstallNFTVotingScript is Script {
         VotingPowerCondition _condition,
         bool _mintedNewToken
     ) internal view returns (Action[] memory actions) {
-        actions = new Action[](_mintedNewToken ? 9 : 6);
+        actions = new Action[](_mintedNewToken ? 10 : 6);
 
         actions[0] = _grantAction(_dao, address(_plugin), address(_dao), _plugin.UPDATE_VOTING_SETTINGS_PERMISSION_ID());
         actions[1] = _grantAction(_dao, address(_dao), address(_plugin), _dao.EXECUTE_PERMISSION_ID());
@@ -207,6 +214,7 @@ contract InstallNFTVotingScript is Script {
             actions[6] = _grantAction(_dao, address(_token), address(_dao), nft.MINT_PERMISSION_ID());
             actions[7] = _grantAction(_dao, address(_token), address(_dao), nft.BURN_PERMISSION_ID());
             actions[8] = _grantAction(_dao, address(_token), address(_dao), nft.TRANSFER_PERMISSION_ID());
+            actions[9] = _grantAction(_dao, address(_token), address(_dao), nft.UPDATE_BASE_URI_ID());
         }
     }
 
@@ -244,6 +252,7 @@ contract InstallNFTVotingScript is Script {
         params.existingToken = vm.envOr("TOKEN_ADDRESS", address(0));
         params.tokenName = vm.envOr("TOKEN_NAME", string("Governance NFT"));
         params.tokenSymbol = vm.envOr("TOKEN_SYMBOL", string("GOVNFT"));
+        params.baseTokenURI = vm.envOr("BASE_TOKEN_URI", string(""));
         params.nftCount = vm.envOr("NFT_COUNT", uint256(1));
     }
 

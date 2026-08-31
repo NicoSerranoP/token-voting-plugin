@@ -44,6 +44,7 @@ contract InstallNFTVotingTest is ForkTestBase {
         assertTrue(dao.isGranted(address(nft), address(dao), nft.MINT_PERMISSION_ID(), ""));
         assertTrue(dao.isGranted(address(nft), address(dao), nft.BURN_PERMISSION_ID(), ""));
         assertTrue(dao.isGranted(address(nft), address(dao), nft.TRANSFER_PERMISSION_ID(), ""));
+        assertTrue(dao.isGranted(address(nft), address(dao), nft.UPDATE_BASE_URI_ID(), ""));
     }
 
     function test_WhenCreatingANewDaoWithAnExistingToken() external {
@@ -52,8 +53,15 @@ contract InstallNFTVotingTest is ForkTestBase {
         receivers[1] = alice;
         receivers[2] = bob;
 
+        GovernanceERC721.TokenSettings memory settings = GovernanceERC721.TokenSettings({
+            name: "Existing NFT",
+            symbol: "EXIST",
+            baseURI: "https://example.com/",
+            receivers: receivers
+        });
+
         GovernanceERC721 existingToken =
-            new GovernanceERC721(IDAO(address(0)), "Existing NFT", "EXIST", GovernanceERC721.MintSettings(receivers));
+            new GovernanceERC721(IDAO(address(0)), settings);
 
         InstallParams memory params = _defaultParams();
         params.existingToken = address(existingToken);
